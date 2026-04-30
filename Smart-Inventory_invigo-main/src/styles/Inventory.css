@@ -1,0 +1,38 @@
+@tailwind components;
+@tailwind utilities;
+
+.inv-page { @apply min-h-screen relative z-10 p-8 lg:p-12 max-w-7xl mx-auto; }
+.inv-head { @apply mb-10; }
+.inv-head h1 { @apply text-3xl font-black text-[#0F172A] tracking-tight; }
+.inv-head .muted { @apply text-[#0F172A]/50 font-bold uppercase tracking-widest text-[10px] mt-1 block; }
+.inv-grid { @apply grid lg:grid-cols-[1fr_2.5fr] gap-8; }
+.card { @apply bg-white/90 backdrop-blur-xl border border-white/40 p-8 rounded-[2rem]; box-shadow: var(--shadow-premium); transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+.card:hover { box-shadow: var(--shadow-premium-hover); transform: translateY(-4px); }
+.card-title { @apply mb-6; }
+.card-title h2 { @apply text-xl font-black text-[#0F172A] mb-1; }
+.card-title .muted { @apply text-[10px] font-bold uppercase tracking-widest text-[#0F172A]/40 block; }
+.form { @apply flex flex-col gap-5; }
+.field { @apply flex flex-col gap-2 relative; }
+.field label { @apply text-[10px] font-black uppercase tracking-widest text-[#0F172A]/70; }
+select, input[type="text"], input[type="number"], input[type="date"] { @apply w-full rounded-2xl bg-[#0F172A]/5 border-transparent px-4 py-3 font-bold text-sm focus:bg-white focus:ring-2 focus:ring-[#007A5E]/50 transition-all outline-none text-[#0F172A]; }
+input[type="date"] { @apply max-w-full; }
+.row2 { @apply grid grid-cols-2 gap-4; }
+.preview { @apply bg-[#0F172A]/[0.03] p-4 rounded-2xl border border-[#0F172A]/5 flex flex-col gap-1; }
+.preview strong { @apply text-[#0F172A] font-black text-lg; }
+.actions { @apply flex items-center gap-3 mt-4; }
+.btn { @apply rounded-xl font-black transition-all active:scale-95 text-center flex items-center justify-center; }
+.btn-primary { @apply bg-[#007A5E] text-white py-3 px-6 hover:shadow-lg w-full flex-1 text-sm; box-shadow: var(--shadow-premium); }
+.btn-ghost { @apply bg-transparent text-[#0F172A]/60 py-3 px-6 hover:bg-[#0F172A]/5 text-sm; }
+.btn-small { @apply px-3 py-2 text-[10px] uppercase tracking-widest bg-[#0F172A]/5 text-[#0F172A] hover:bg-[#007A5E] hover:text-white rounded-lg transition-colors border-none cursor-pointer; }
+.btn-danger { @apply hover:bg-red-500 hover:text-white; }
+.table-wrap { @apply overflow-x-auto; }
+.table { @apply w-full text-left border-collapse; }
+.table th { @apply px-4 py-3 font-black uppercase text-[10px] tracking-widest border-b border-[#0F172A]/5 text-[#0F172A]/60; }
+.table td { @apply px-4 py-4 border-b border-[#0F172A]/5 text-sm font-bold text-[#0F172A] whitespace-nowrap; }
+.table .right { @apply text-right; }
+.pill { @apply inline-flex px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest; }
+.pill.good, .pill.valid, .pill.fresh { @apply bg-emerald-100 text-emerald-700; }
+.pill.expiring-soon, .pill.expiring { @apply bg-orange-100 text-orange-600; }
+.pill.expired { @apply bg-red-100 text-red-600; }
+.banner { @apply p-4 rounded-xl mb-6 font-bold text-sm bg-red-50 text-red-600 border border-red-100; }
+.muted { @apply text-[#0F172A]/50 font-medium; }

@@ -1,0 +1,76 @@
+=================================================================
+STEP 5 — SAMPLE PREDICTION NARRATIVES
+=================================================================
+
+HOW TO READ:
+  The ML model outputs a probability score (0–1).
+  Business rules then map that score to a store action.
+  'Rules do not replace ML; they consume ML output.'
+
+🔴 CRITICAL ALERT — Beef [Meat]
+   ML Probability   : 0.99  (99% likely to expire before selling)
+   Days to Expiry   : 1 days
+   Stock on Hand    : 304 units
+   Avg Daily Sales  : 97.0 units/day
+   Days to Sell Out : 3 days  (expires in 1 days → will NOT sell out in time)
+   Business Action  : ALERT — Discount + Notify Manager
+   WHY FLAGGED      : stock will last ~3 days but expires in 1 days
+
+🔴 CRITICAL ALERT — Fresh Pasta [Ready_to_Eat]
+   ML Probability   : 1.00  (100% likely to expire before selling)
+   Days to Expiry   : 0 days
+   Stock on Hand    : 144 units
+   Avg Daily Sales  : 102.0 units/day
+   Days to Sell Out : 1 days  (expires in 0 days → will NOT sell out in time)
+   Business Action  : ALERT — Discount + Notify Manager
+   WHY FLAGGED      : stock will last ~1 days but expires in 0 days
+
+🔴 CRITICAL ALERT — Shrimp [Seafood]
+   ML Probability   : 0.97  (97% likely to expire before selling)
+   Days to Expiry   : 0 days
+   Stock on Hand    : 370 units
+   Avg Daily Sales  : 139.0 units/day
+   Days to Sell Out : 3 days  (expires in 0 days → will NOT sell out in time)
+   Business Action  : ALERT — Discount + Notify Manager
+   WHY FLAGGED      : stock will last ~3 days but expires in 0 days
+
+🟡 WATCH — Frozen Vegetables [Frozen_Meals]
+   ML Probability   : 0.51  (moderate expiry risk)
+   Days to Expiry   : 144 days
+   Business Action  : WATCH — Flag for Review
+
+🟡 WATCH — Pizza [Frozen_Meals]
+   ML Probability   : 0.67  (moderate expiry risk)
+   Days to Expiry   : 211 days
+   Business Action  : WATCH — Flag for Review
+
+🟢 SAFE — Tomatoes [Produce]
+   ML Probability   : 0.00  (low expiry risk)
+   Days to Expiry   : 4 days
+   Business Action  : SAFE  — No Action Needed
+
+🟢 SAFE — Pastries [Bakery]
+   ML Probability   : 0.29  (low expiry risk)
+   Days to Expiry   : 1 days
+   Business Action  : SAFE  — No Action Needed
+
+=================================================================
+KEY VIVA EXPLANATION:
+=================================================================
+
+Each prediction above comes from the Random Forest model which:
+  1. Takes 21 inventory features (days_to_expiry, avg_daily_sales,
+     spoilage_sensitivity, handling_score, shelf_life_days, etc.)
+  2. Passes them through 100 trained decision trees
+  3. Each tree votes → averaged into a probability (0–1)
+  4. The probability tells us HOW LIKELY this product is to expire
+     before being sold — not just a yes/no binary guess
+
+Business rules then ACT on that probability:
+  > 0.70 → ALERT  → Trigger discount + notify manager
+  0.40–0.70 → WATCH  → Flag for daily review
+  < 0.40 → SAFE   → No action needed
+
+This is smarter than just checking expiry dates because:
+  • A product with 5 days left but high daily sales = SAFE
+  • A product with 30 days left but nearly zero sales = CRITICAL

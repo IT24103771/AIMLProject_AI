@@ -1,0 +1,15 @@
+{
+  "features": [
+    "days_to_expiry",
+    "remaining_qty",
+    "total_units_sold",
+    "avg_daily_sales",
+    "sales_velocity",
+    "sell_through_rate",
+    "stock_pressure_ratio",
+    "recent_sales_trend",
+    "quality_grade_encoded",
+    "category_encoded"
+  ],
+  "target": "expire_before_sold"
+}

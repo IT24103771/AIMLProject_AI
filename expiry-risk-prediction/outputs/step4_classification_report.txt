@@ -1,0 +1,32 @@
+============================================================
+STEP 4 — MODEL EVALUATION REPORT
+Project: Smart Inventory Management — Expiry Risk
+============================================================
+
+LOGISTIC REGRESSION
+----------------------------------------
+               precision    recall  f1-score   support
+
+ Low Risk (0)       0.95      0.79      0.86     14537
+High Risk (1)       0.61      0.88      0.72      5463
+
+     accuracy                           0.81     20000
+    macro avg       0.78      0.83      0.79     20000
+ weighted avg       0.85      0.81      0.82     20000
+
+RANDOM FOREST (TUNED)
+----------------------------------------
+               precision    recall  f1-score   support
+
+ Low Risk (0)       0.96      0.98      0.97     14537
+High Risk (1)       0.94      0.90      0.92      5463
+
+     accuracy                           0.96     20000
+    macro avg       0.95      0.94      0.95     20000
+ weighted avg       0.96      0.96      0.96     20000
+
+SIDE-BY-SIDE COMPARISON
+----------------------------------------
+                Model  Accuracy  Precision  Recall  F1 Score  ROC-AUC  Avg Precision
+  Logistic Regression    0.8132     0.6092  0.8816    0.7205   0.8775         0.6306
+Random Forest (Tuned)    0.9574     0.9421  0.8993    0.9202   0.9891         0.9749
