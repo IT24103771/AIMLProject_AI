@@ -204,7 +204,7 @@ const Dashboard = () => {
       
       const stats = byCategory.get(cat);
       if (risk === "HIGH") stats.HIGH += 1;
-      else if (risk === "MEDIUM") stats.MEDIUM += 1;
+      else if (risk === "NORMAL" || risk === "MEDIUM") stats.NORMAL += 1;
       else stats.LOW += 1;
     });
 
@@ -212,7 +212,10 @@ const Dashboard = () => {
     if (filterHighRisk) {
       data = data.filter(d => d.HIGH > 0);
     }
-    return data;
+    return data.map(d => ({
+      ...d,
+      NORMAL: d.NORMAL || d.MEDIUM || 0 // handle legacy medium
+    }));
   }, [products, filterHighRisk]);
 
   return (
@@ -409,9 +412,11 @@ const Dashboard = () => {
                           <span
                             className={
                               "pill " +
-                              ((x.status || "").toLowerCase().includes("expired")
+                              ((x.status || "").toLowerCase().includes("expired") || (x.status || "").toLowerCase().includes("high risk")
                                 ? "pill-bad"
-                                : "pill-warn")
+                                : (x.status || "").toLowerCase().includes("soon") || (x.status || "").toLowerCase().includes("normal risk")
+                                  ? "pill-warn"
+                                  : "pill-good")
                             }
                           >
                             {x.status}
@@ -422,7 +427,7 @@ const Dashboard = () => {
                             className={
                               "pill " +
                               (x.riskLevel === "HIGH" ? "pill-bad" : 
-                               x.riskLevel === "MEDIUM" ? "pill-warn" : "pill-good")
+                               (x.riskLevel === "NORMAL" || x.riskLevel === "MEDIUM") ? "pill-warn" : "pill-good")
                             }
                             title={x.riskProbability ? `Probability: ${Math.round(x.riskProbability * 100)}%` : ""}
                           >
@@ -529,7 +534,7 @@ const Dashboard = () => {
                     <Pie
                       data={[
                         { name: "High Risk", value: products.filter(p => p.riskLevel === "HIGH").length, color: "#EF4444" },
-                        { name: "Medium Risk", value: products.filter(p => p.riskLevel === "MEDIUM").length, color: "#F59E0B" },
+                        { name: "Normal Risk", value: products.filter(p => p.riskLevel === "NORMAL" || p.riskLevel === "MEDIUM").length, color: "#F59E0B" },
                         { name: "Low Risk", value: products.filter(p => !p.riskLevel || p.riskLevel === "LOW").length, color: "#10B981" }
                       ].filter(d => d.value > 0)}
                       dataKey="value"
@@ -545,7 +550,7 @@ const Dashboard = () => {
                       {
                         [
                           { name: "High Risk", value: products.filter(p => p.riskLevel === "HIGH").length, color: "#EF4444" },
-                          { name: "Medium Risk", value: products.filter(p => p.riskLevel === "MEDIUM").length, color: "#F59E0B" },
+                          { name: "Normal Risk", value: products.filter(p => p.riskLevel === "NORMAL" || p.riskLevel === "MEDIUM").length, color: "#F59E0B" },
                           { name: "Low Risk", value: products.filter(p => !p.riskLevel || p.riskLevel === "LOW").length, color: "#10B981" }
                         ].filter(d => d.value > 0).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.1)" strokeWidth={2} />
@@ -588,7 +593,7 @@ const Dashboard = () => {
                     <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#1E293B', border: 'none', borderRadius: '8px', color: '#fff' }} />
                     <Legend />
                     <Bar dataKey="HIGH" name="High Risk" stackId="a" fill="#EF4444" radius={[0, 0, 4, 4]} />
-                    <Bar dataKey="MEDIUM" name="Medium Risk" stackId="a" fill="#F59E0B" />
+                    <Bar dataKey="NORMAL" name="Normal Risk" stackId="a" fill="#F59E0B" />
                     <Bar dataKey="LOW" name="Low Risk" stackId="a" fill="#10B981" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

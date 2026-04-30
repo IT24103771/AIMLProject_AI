@@ -159,15 +159,21 @@ public class InventoryService {
         }
     }
 
-    private String status(LocalDate expiry) {
+    private String status(LocalDate expiry, String riskLevel) {
         LocalDate today = LocalDate.now();
 
         if (expiry.isBefore(today)) return "Expired";
+        
+        // Prioritize AI Risk Level
+        if ("HIGH".equalsIgnoreCase(riskLevel)) return "HIGH RISK";
+        if ("NORMAL".equalsIgnoreCase(riskLevel)) return "NORMAL RISK";
+        
         if (!expiry.isAfter(today.plusDays(7))) return "Expiring Soon";
         return "Safe";
     }
 
     private InventoryResponse toResponse(Inventory inv) {
+        String riskLevel = inv.getProduct().getRiskLevel();
         InventoryResponse res = new InventoryResponse(
                 inv.getId(),
                 inv.getProduct().getProductId(),
@@ -175,10 +181,10 @@ public class InventoryService {
                 inv.getBatchNumber(),
                 inv.getQuantity(),
                 inv.getExpiryDate(),
-                status(inv.getExpiryDate()),
+                status(inv.getExpiryDate(), riskLevel),
                 inv.getCreatedAt()
         );
-        res.setRiskLevel(inv.getProduct().getRiskLevel());
+        res.setRiskLevel(riskLevel);
         res.setRiskProbability(inv.getProduct().getRiskProbability());
         return res;
     }

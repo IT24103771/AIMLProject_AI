@@ -120,10 +120,10 @@ public class ProductService {
         requestBody.put("remaining_quantity", stock);
         requestBody.put("days_to_expiry", daysToExpiry);
         
-        Long sold = saleRepository.getTotalQuantitySoldByProductId(id);
-        if (sold != null && sold > 0) {
-            requestBody.put("avg_daily_sales", sold / 30.0); // simple approximation
-        }
+        LocalDate sevenDaysAgo = LocalDate.now().minusDays(7);
+        Long soldLast7Days = saleRepository.getTotalQuantitySoldByProductIdAfter(id, sevenDaysAgo);
+        double salesVelocity = (soldLast7Days != null) ? soldLast7Days / 7.0 : 0.0;
+        requestBody.put("sales_velocity", salesVelocity);
 
         String url = FLASK_API_URL + "/predict";
         
@@ -137,11 +137,14 @@ public class ProductService {
                 Map<String, Object> body = response.getBody();
                 p.setRiskLevel((String) body.get("risk_level"));
                 
-                Object prob = body.get("risk_probability");
-                if (prob instanceof Double) {
-                    p.setRiskProbability((Double) prob);
-                } else if (prob instanceof Integer) {
-                    p.setRiskProbability(((Integer) prob).doubleValue());
+                // We'll store the ratio in the risk probability field for visualization if needed
+                Object ratio = body.get("ratio");
+                if (ratio instanceof Double) {
+                    p.setRiskProbability((Double) ratio);
+                } else if (ratio instanceof Integer) {
+                    p.setRiskProbability(((Integer) ratio).doubleValue());
+                } else {
+                    p.setRiskProbability(0.0);
                 }
                 
                 p.setRiskAction((String) body.get("action"));
@@ -149,7 +152,7 @@ public class ProductService {
                 repo.save(p);
                 
                 if ("HIGH".equals(p.getRiskLevel())) {
-                    System.out.println("ALERT: High risk product detected - " + p.getProductName());
+                    System.out.println("ALERT: High risk product detected - " + p.getProductName() + " (Ratio: " + p.getRiskProbability() + ")");
                 }
             }
         } catch (Exception e) {
