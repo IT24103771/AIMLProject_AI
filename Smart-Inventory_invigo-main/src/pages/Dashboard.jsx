@@ -131,7 +131,7 @@ const Dashboard = () => {
     return inventory
       .filter((x) => {
         const st = (x.status || "").toLowerCase();
-        return st.includes("expiring") || st.includes("expired");
+        return st.includes("expiring") || st.includes("expired") || st.includes("risk");
       })
       .slice()
       .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)))
@@ -199,7 +199,7 @@ const Dashboard = () => {
       const risk = p.riskLevel || "LOW";
       
       if (!byCategory.has(cat)) {
-        byCategory.set(cat, { category: cat, HIGH: 0, MEDIUM: 0, LOW: 0 });
+        byCategory.set(cat, { category: cat, HIGH: 0, NORMAL: 0, LOW: 0 });
       }
       
       const stats = byCategory.get(cat);
@@ -212,11 +212,16 @@ const Dashboard = () => {
     if (filterHighRisk) {
       data = data.filter(d => d.HIGH > 0);
     }
-    return data.map(d => ({
-      ...d,
-      NORMAL: d.NORMAL || d.MEDIUM || 0 // handle legacy medium
-    }));
+    return data;
   }, [products, filterHighRisk]);
+
+  // Discount Suggestions
+  const discountSuggestions = useMemo(() => {
+    return inventory
+      .filter((x) => x.riskLevel === "HIGH" && x.suggestedDiscount && x.suggestedDiscount > 0)
+      .slice()
+      .sort((a, b) => b.suggestedDiscount - a.suggestedDiscount);
+  }, [inventory]);
 
   return (
     <div className="dash-page">
@@ -599,6 +604,60 @@ const Dashboard = () => {
                 </ResponsiveContainer>
               )}
             </div>
+          </div>
+
+          {/* Discount Suggestions */}
+          <div className="card" style={{ gridColumn: '1 / -1' }}>
+            <div className="card-title">
+              <h2><Tag size={20} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '8px', color: '#10B981' }} /> Discount Suggestions</h2>
+              <span className="muted">Actionable pricing for HIGH RISK items to reduce loss</span>
+            </div>
+
+            {discountSuggestions.length === 0 ? (
+              <div className="empty">No actionable discount suggestions right now.</div>
+            ) : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Batch</th>
+                      <th className="right">Risk</th>
+                      <th className="right">Days Left</th>
+                      <th className="right">Price</th>
+                      <th className="right">Cost</th>
+                      <th className="right">Suggested Discount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {discountSuggestions.map((x) => {
+                      const daysLeft = Math.max(0, Math.ceil((new Date(x.expiryDate) - new Date()) / (1000 * 60 * 60 * 24)));
+                      return (
+                        <tr key={x.id}>
+                          <td>{x.productName}</td>
+                          <td>{x.batchNumber}</td>
+                          <td className="right">
+                            <span className="pill pill-bad">HIGH RISK</span>
+                          </td>
+                          <td className="right">
+                            <span style={{ fontWeight: 'bold', color: daysLeft <= 3 ? '#DC2626' : 'inherit' }}>
+                              {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
+                            </span>
+                          </td>
+                          <td className="right">Rs. {x.sellingPrice?.toFixed(2) || "0.00"}</td>
+                          <td className="right">Rs. {x.costPrice?.toFixed(2) || "0.00"}</td>
+                          <td className="right">
+                            <span className="pill" style={{ backgroundColor: '#D1FAE5', color: '#059669', fontSize: '12px' }}>
+                              {x.suggestedDiscount?.toFixed(1)}% OFF
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </div>

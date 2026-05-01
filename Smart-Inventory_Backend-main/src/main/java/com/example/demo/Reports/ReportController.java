@@ -20,11 +20,19 @@ public class ReportController {
     private final ReportService reportService;
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final AiRiskReportService aiRiskReportService;
 
-    public ReportController(ReportService reportService, ReportRepository reportRepository, UserRepository userRepository) {
+    public ReportController(ReportService reportService, ReportRepository reportRepository,
+                            UserRepository userRepository, AiRiskReportService aiRiskReportService) {
         this.reportService = reportService;
         this.reportRepository = reportRepository;
         this.userRepository = userRepository;
+        this.aiRiskReportService = aiRiskReportService;
+    }
+
+    @GetMapping("/ai-risk")
+    public ResponseEntity<List<AiRiskReportResponse>> getAiRiskReport() {
+        return ResponseEntity.ok(aiRiskReportService.generateReport());
     }
 
     @PostMapping

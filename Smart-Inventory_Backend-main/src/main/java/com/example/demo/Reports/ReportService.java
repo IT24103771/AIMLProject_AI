@@ -25,11 +25,14 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final InventoryRepository inventoryRepository;
     private final SaleRepository saleRepository;
+    private final AiRiskReportService aiRiskReportService;
 
-    public ReportService(ReportRepository reportRepository, InventoryRepository inventoryRepository, SaleRepository saleRepository) {
+    public ReportService(ReportRepository reportRepository, InventoryRepository inventoryRepository,
+                         SaleRepository saleRepository, AiRiskReportService aiRiskReportService) {
         this.reportRepository = reportRepository;
         this.inventoryRepository = inventoryRepository;
         this.saleRepository = saleRepository;
+        this.aiRiskReportService = aiRiskReportService;
     }
 
     public ReportResponse createReport(ReportRequest request, String username) {
@@ -126,6 +129,9 @@ public class ReportService {
                 break;
             case SALES:
                 generateSalesTable(document, report, brandGreen, slateLight, brandSlate);
+                break;
+            case AI_RISK:
+                generateAiRiskTable(document, brandGreen, slateLight, brandSlate);
                 break;
         }
 
@@ -232,6 +238,55 @@ public class ReportService {
         document.add(new Paragraph("Total Gross Revenue: $" + String.format("%.2f", totalRevenue)).setBold().setFontColor(brandSlate));
     }
     
+    private void generateAiRiskTable(Document document,
+                                      com.itextpdf.kernel.colors.Color brandGreen,
+                                      com.itextpdf.kernel.colors.Color slateLight,
+                                      com.itextpdf.kernel.colors.Color brandSlate) {
+        java.util.List<AiRiskReportResponse> rows = aiRiskReportService.generateReport();
+
+        com.itextpdf.kernel.colors.Color redBg    = new com.itextpdf.kernel.colors.DeviceRgb(254, 226, 226);
+        com.itextpdf.kernel.colors.Color yellowBg = new com.itextpdf.kernel.colors.DeviceRgb(254, 243, 199);
+        com.itextpdf.kernel.colors.Color greenBg  = new com.itextpdf.kernel.colors.DeviceRgb(209, 250, 229);
+
+        Table table = new Table(new float[]{3, 2, 2, 1, 2, 1, 2, 2});
+        table.setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100));
+        addTableHeader(table, brandGreen, white, "Product", "Category", "Batch", "Qty", "Expiry", "Days Left", "Risk", "Discount");
+
+        int rowIndex = 0;
+        long highCount = 0, normalCount = 0, lowCount = 0;
+
+        for (AiRiskReportResponse r : rows) {
+            com.itextpdf.kernel.colors.Color rowBg;
+            if ("HIGH".equals(r.getRiskLabel()))   { rowBg = redBg;    highCount++; }
+            else if ("NORMAL".equals(r.getRiskLabel())) { rowBg = yellowBg; normalCount++; }
+            else { rowBg = (rowIndex % 2 == 1) ? slateLight : null; lowCount++; }
+
+            String discount = r.getSuggestedDiscount() > 0
+                    ? String.format("%.1f%%", r.getSuggestedDiscount()) : "-";
+
+            String daysLeftStr = (r.getExpiryDate() != null && r.getExpiryDate().isBefore(java.time.LocalDate.now()))
+                    ? "Expired" : String.valueOf(r.getDaysLeft());
+
+            addTableRow(table, rowBg,
+                r.getProductName(),
+                r.getCategory() != null ? r.getCategory() : "-",
+                r.getBatchNumber(),
+                String.valueOf(r.getQuantity()),
+                r.getExpiryDate() != null ? r.getExpiryDate().toString() : "-",
+                daysLeftStr,
+                r.getRiskLabel(),
+                discount);
+            rowIndex++;
+        }
+
+        document.add(table);
+        document.add(new Paragraph("\nSummary:").setBold().setFontColor(brandSlate));
+        document.add(new Paragraph("  Total Batches: " + rows.size()).setFontColor(brandSlate));
+        document.add(new Paragraph("  High Risk: " + highCount).setFontColor(brandSlate));
+        document.add(new Paragraph("  Normal Risk: " + normalCount).setFontColor(brandSlate));
+        document.add(new Paragraph("  Low Risk: " + lowCount).setFontColor(brandSlate));
+    }
+
     private com.itextpdf.kernel.colors.Color white = new com.itextpdf.kernel.colors.DeviceRgb(255, 255, 255);
 
     private void addTableHeader(Table table, com.itextpdf.kernel.colors.Color bgColor, com.itextpdf.kernel.colors.Color fgColor, String... headers) {

@@ -172,6 +172,29 @@ public class InventoryService {
         return "Safe";
     }
 
+    public double calculateDiscount(Product product, long daysToExpiry, String riskLevel) {
+        if (!"HIGH".equalsIgnoreCase(riskLevel)) return 0.0;
+
+        double sellingPrice = product.getSellingPrice();
+        double costPrice = product.getCostPrice();
+        double margin = sellingPrice - costPrice;
+
+        if (margin <= 0) return 0.0;
+
+        double maxDiscount = (margin / sellingPrice) * 100;
+        double suggested;
+
+        if (daysToExpiry <= 1) {
+            suggested = 50.0;
+        } else if (daysToExpiry <= 3) {
+            suggested = 30.0;
+        } else {
+            suggested = 15.0;
+        }
+
+        return Math.min(suggested, maxDiscount);
+    }
+
     private InventoryResponse toResponse(Inventory inv) {
         String riskLevel = inv.getProduct().getRiskLevel();
         InventoryResponse res = new InventoryResponse(
@@ -186,6 +209,14 @@ public class InventoryService {
         );
         res.setRiskLevel(riskLevel);
         res.setRiskProbability(inv.getProduct().getRiskProbability());
+
+        long daysToExpiry = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), inv.getExpiryDate());
+        double discount = calculateDiscount(inv.getProduct(), daysToExpiry, riskLevel);
+
+        res.setSellingPrice(inv.getProduct().getSellingPrice());
+        res.setCostPrice(inv.getProduct().getCostPrice());
+        res.setSuggestedDiscount(discount);
+
         return res;
     }
 }

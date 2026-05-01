@@ -146,6 +146,7 @@ const ReportsForm = ({ open, setOpen, report = null, onSave }) => {
                                         <option value="SALES">Sales Report</option>
                                         <option value="EXPIRED">Expired Items Report</option>
                                         <option value="NEAR_EXPIRY">Near Expiry Report</option>
+                                        <option value="AI_RISK">🤖 AI Risk Report</option>
                                     </select>
                                     {errors.reportType && <p className="text-red-500 text-xs mt-1 font-bold flex items-center gap-1"><AlertCircle size={12}/> {errors.reportType}</p>}
                                 </div>

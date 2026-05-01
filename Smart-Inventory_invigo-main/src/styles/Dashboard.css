@@ -28,6 +28,7 @@
 .pill { @apply px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest; }
 .pill-warn { @apply bg-orange-100 text-orange-600; }
 .pill-bad { @apply bg-red-100 text-red-600; }
+.pill-good { @apply bg-emerald-100 text-emerald-600; }
 .banner { @apply p-4 rounded-xl mb-6 font-bold text-sm; }
 .banner-error { @apply bg-red-50 text-red-600 border border-red-100; }
 .banner-success { @apply bg-emerald-50 text-emerald-600 border border-emerald-100; }

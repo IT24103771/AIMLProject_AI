@@ -14,6 +14,9 @@ public class InventoryResponse {
     private String riskLevel; // HIGH / MEDIUM / LOW
     private Double riskProbability;
     private LocalDateTime createdAt;
+    private Double sellingPrice;
+    private Double costPrice;
+    private Double suggestedDiscount;
 
     public InventoryResponse() {}
 
@@ -43,4 +46,11 @@ public class InventoryResponse {
     public Double getRiskProbability() { return riskProbability; }
     public void setRiskProbability(Double riskProbability) { this.riskProbability = riskProbability; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public Double getSellingPrice() { return sellingPrice; }
+    public void setSellingPrice(Double sellingPrice) { this.sellingPrice = sellingPrice; }
+    public Double getCostPrice() { return costPrice; }
+    public void setCostPrice(Double costPrice) { this.costPrice = costPrice; }
+    public Double getSuggestedDiscount() { return suggestedDiscount; }
+    public void setSuggestedDiscount(Double suggestedDiscount) { this.suggestedDiscount = suggestedDiscount; }
 }

@@ -25,6 +25,23 @@ const DiscountsPage = ({ role = "Staff" }) => {
   const [editNote, setEditNote] = useState("");
   const [editActive, setEditActive] = useState(true);
 
+  const [inventory, setInventory] = useState([]);
+  const [discardedIds, setDiscardedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ai_discarded_suggestions");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [applyingId, setApplyingId] = useState(null);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  // Persist discarded IDs across page refreshes
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai_discarded_suggestions", JSON.stringify(discardedIds));
+    } catch { }
+  }, [discardedIds]);
+
   const selectedProduct = useMemo(() => {
     return products.find((p) => String(p.id) === String(selectedProductId));
   }, [products, selectedProductId]);
@@ -76,6 +93,70 @@ const DiscountsPage = ({ role = "Staff" }) => {
   useEffect(() => {
     loadDiscounts();
   }, []);
+
+  useEffect(() => {
+    const loadInventory = async () => {
+      try {
+        const res = await authFetch(`${API_BASE}/inventory`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setInventory(Array.isArray(data) ? data : []);
+      } catch { }
+    };
+    loadInventory();
+  }, []);
+
+  // Batch IDs that already have a discount applied (active or inactive)
+  const discountedBatchIds = useMemo(() => {
+    return new Set(discounts.map((d) => d.batchId).filter(Boolean));
+  }, [discounts]);
+
+  const discountSuggestions = useMemo(() => {
+    return inventory.filter(
+      (x) =>
+        x.riskLevel === "HIGH" &&
+        x.suggestedDiscount &&
+        x.suggestedDiscount > 0 &&
+        !discardedIds.includes(x.id) &&
+        !discountedBatchIds.has(x.id)   // hide if discount already exists for this batch
+    ).sort((a, b) => b.suggestedDiscount - a.suggestedDiscount);
+  }, [inventory, discardedIds, discountedBatchIds]);
+
+  const handleApplySuggestion = async (item) => {
+    setApplyingId(item.id);
+    setError("");
+    setSuccessMsg("");
+    try {
+      const payload = {
+        productId: Number(item.productId),
+        batchId: Number(item.id),
+        discountPercent: Math.round(item.suggestedDiscount),
+        note: `AI suggested – ${Math.round(item.suggestedDiscount)}% off (HIGH RISK, expires ${item.expiryDate})`,
+        active: true,
+      };
+      const res = await authFetch(`${API_BASE}/discounts`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        let msg = "Failed to apply discount";
+        try { const d = await res.json(); msg = d.message || msg; } catch { }
+        throw new Error(msg);
+      }
+      const created = await res.json();
+      setDiscounts((prev) => [created, ...prev]);
+      setDiscardedIds((prev) => [...prev, item.id]);
+      setSuccessMsg(`Discount of ${Math.round(item.suggestedDiscount)}% applied to ${item.productName} (Batch ${item.batchNumber})!`);
+    } catch (e) {
+      setError(e.message || "Could not apply discount");
+    } finally {
+      setApplyingId(null);
+    }
+  };
+
+  const handleDiscardSuggestion = (id) => {
+    setDiscardedIds((prev) => [...prev, id]);
+  };
 
   useEffect(() => {
     if (!selectedProductId) {
@@ -372,6 +453,67 @@ const DiscountsPage = ({ role = "Staff" }) => {
           </div>
         )}
       </div>
+
+      {successMsg && <div className="banner-success">{successMsg}</div>}
+
+      {/* AI Discount Suggestions – Admin only */}
+      {role === "Admin" && (
+        <div className="section-card" style={{ borderLeft: "4px solid #EF4444" }}>
+          <div className="section-title">
+            <h2 style={{ color: "#EF4444" }}>🤖 AI Discount Suggestions</h2>
+            <span className="muted">HIGH RISK batches – apply before they expire to avoid losses</span>
+          </div>
+
+          {discountSuggestions.length === 0 ? (
+            <div className="empty">No AI suggestions right now. Sync AI risk from the Dashboard.</div>
+          ) : (
+            <div className="list">
+              {discountSuggestions.map((item) => {
+                const daysLeft = Math.max(0, Math.ceil((new Date(item.expiryDate) - new Date()) / 86400000));
+                const isBusy = applyingId === item.id;
+                return (
+                  <div className="list-item" key={item.id} style={{ borderLeft: "3px solid #EF4444" }}>
+                    <div className="li-left">
+                      <div className="li-title">{item.productName}</div>
+                      <div className="li-sub">
+                        Batch: <b>{item.batchNumber}</b> &nbsp;|&nbsp;
+                        Qty: <b>{item.quantity}</b> &nbsp;|&nbsp;
+                        Expires: <b style={{ color: daysLeft <= 3 ? "#DC2626" : "inherit" }}>{item.expiryDate} ({daysLeft}d left)</b> &nbsp;|&nbsp;
+                        Price: <b>Rs.{item.sellingPrice?.toFixed(2)}</b> &nbsp;|&nbsp;
+                        Cost: <b>Rs.{item.costPrice?.toFixed(2)}</b>
+                      </div>
+                    </div>
+                    <div className="li-right">
+                      <span className="pill" style={{ background: "#FEE2E2", color: "#DC2626" }}>HIGH RISK</span>
+                      <span className="pill" style={{ background: "#D1FAE5", color: "#059669", fontSize: "13px" }}>
+                        {item.suggestedDiscount?.toFixed(1)}% OFF
+                      </span>
+                      <div className="actions">
+                        <button
+                          className="btn-primary"
+                          disabled={isBusy}
+                          onClick={() => handleApplySuggestion(item)}
+                          title="Apply this AI-suggested discount"
+                        >
+                          {isBusy ? "Applying…" : "✓ Apply"}
+                        </button>
+                        <button
+                          className="btn-danger"
+                          disabled={isBusy}
+                          onClick={() => handleDiscardSuggestion(item.id)}
+                          title="Dismiss this suggestion"
+                        >
+                          ✕ Discard
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="section-card">
         <div className="section-title">

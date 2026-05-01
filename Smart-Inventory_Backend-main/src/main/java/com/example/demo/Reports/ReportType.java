@@ -4,5 +4,6 @@ public enum ReportType {
     EXPIRED,
     NEAR_EXPIRY,
     SALES,
-    INVENTORY
+    INVENTORY,
+    AI_RISK
 }

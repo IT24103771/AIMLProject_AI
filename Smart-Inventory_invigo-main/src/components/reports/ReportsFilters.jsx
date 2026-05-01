@@ -2,7 +2,7 @@ import React from "react";
 import { Search, Filter } from "lucide-react";
 
 export const reportTypes = [
-    "EXPIRED", "NEAR_EXPIRY", "SALES", "INVENTORY"
+    "EXPIRED", "NEAR_EXPIRY", "SALES", "INVENTORY", "AI_RISK"
 ];
 
 const ReportsFilters = ({ filters, setFilters, role }) => {
@@ -35,6 +35,7 @@ const ReportsFilters = ({ filters, setFilters, role }) => {
                     <option value="SALES">Sales Report</option>
                     <option value="EXPIRED">Expired Items Report</option>
                     <option value="NEAR_EXPIRY">Near Expiry Report</option>
+                    <option value="AI_RISK">🤖 AI Risk Report</option>
                 </select>
 
                 {role === "ADMIN" && (

@@ -43,6 +43,7 @@ const Sidebar = ({ open, setOpen }) => {
     { label: "Discounts", href: "/admin/discounts", icon: Tag },
     { label: "Alerts", href: "/admin/alerts", icon: AlertTriangle },
     { label: "Reports", href: "/admin/reports", icon: BarChart3 },
+    { label: "AI Risk Report", href: "/admin/ai-risk", icon: AlertTriangle },
     { label: "User Control", href: "/admin/users", icon: Users },
     { label: "Settings", href: "/admin/settings", icon: Settings },
   ];
@@ -621,6 +622,7 @@ const UserManagement = ({ users, setUsers }) => {
   </div>);
 };
 import ReportsManagement from "./ReportsManagement";
+import AIRiskReport from "./AIRiskReport";
 
 const Admin = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -639,6 +641,8 @@ const Admin = () => {
       return "Risk Control";
     if (location.pathname === "/admin/reports")
       return "Data Intelligence";
+    if (location.pathname === "/admin/ai-risk")
+      return "AI Risk Report";
     if (location.pathname === "/admin/settings")
       return "System Config";
     return "Admin Panel";
@@ -663,6 +667,7 @@ const Admin = () => {
                 if (location.pathname === "/admin/discounts") return <DiscountsPage role="Admin" />;
                 if (location.pathname === "/admin/alerts") return <AdminAlertsPage />;
                 if (location.pathname === "/admin/reports") return <ReportsManagement role="ADMIN" />;
+                if (location.pathname === "/admin/ai-risk") return <AIRiskReport />;
                 if (location.pathname === "/admin" || location.pathname === "/admin/") return <Dashboard />;
                 return (
                   <div className="text-center py-24">
