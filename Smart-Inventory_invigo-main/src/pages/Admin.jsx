@@ -1,23 +1,34 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Package, AlertTriangle, BarChart3, Settings, Menu, TrendingUp, Users, UserPlus, Plus, Clock, Eye, EyeOff, Edit2, Trash2, Power, Tag, Home } from "lucide-react";
+import {
+  LayoutDashboard, Package, AlertTriangle, BarChart3, Settings, Menu,
+  TrendingUp, Users, UserPlus, Plus, Clock, Eye, EyeOff, Edit2, Trash2,
+  Power, Tag, Home, Shield, Search
+} from "lucide-react";
+
 import InvigoLogo from "@/components/InvigoLogo";
 import LogoutButton from "@/components/LogoutButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
-import { getUsers, createUser, updateUser, deleteUser, unlockUser } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+import { getUsers, createUser, updateUser, deleteUser, unlockUser, getRoles } from "@/lib/api";
 import SalesModule from "@/components/SalesModule";
+import RoleManagement from "@/components/RoleManagement";
+import SecurityActivity from "@/components/SecurityActivity";
+
 import InventoryPage from "./InventoryPage";
 import DiscountsPage from "./DiscountsPage";
 import AdminAlertsPage from "./AdminAlertsPage";
 import Dashboard from "./Dashboard";
+import ReportsManagement from "./ReportsManagement";
+import AIRiskReport from "./AIRiskReport";
 // --- Types & Data ---
 // Removed initialUsers since we fetch from backend
 const adminStats = [
@@ -27,9 +38,9 @@ const adminStats = [
   { label: "Staff Active", value: "6", sub: "Currently on shift", icon: Users, color: "text-[#007A5E]", bg: "bg-[#007A5E]/10" },
 ];
 const expiringItems = [
-  { name: "Fresh Milk 1L", sku: "FM-1023", expiry: "In 2 days", risk: "Critical" },
+  { name: "Fresh Milk 1L", sku: "FM-1023", expiry: "In 2 days", risk: "High" },
   { name: "Yogurt Plain 500g", sku: "YP-2041", expiry: "In 3 days", risk: "High" },
-  { name: "Cheese Spread 200g", sku: "CS-3089", expiry: "In 4 days", risk: "Medium" },
+  { name: "Cheese Spread 200g", sku: "CS-3089", expiry: "In 4 days", risk: "High" },
   { name: "Leafy Greens Mix", sku: "LG-4102", expiry: "In 5 days", risk: "Low" },
 ];
 // --- Sub-components (Redesigned) ---
@@ -45,6 +56,8 @@ const Sidebar = ({ open, setOpen }) => {
     { label: "Reports", href: "/admin/reports", icon: BarChart3 },
     { label: "AI Risk Report", href: "/admin/ai-risk", icon: AlertTriangle },
     { label: "User Control", href: "/admin/users", icon: Users },
+    { label: "Role Management", href: "/admin/roles", icon: Shield },
+    { label: "Security Activity", href: "/admin/security", icon: Shield },
     { label: "Settings", href: "/admin/settings", icon: Settings },
   ];
   return (<>
@@ -206,56 +219,65 @@ const AdminDashboardHome = () => (<div className="space-y-10">
   </div>
 </div>);
 const UserManagement = ({ users, setUsers }) => {
-  // Global View State
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [globalError, setGlobalError] = useState("");
-  // Create State
+  const [availableRoles, setAvailableRoles] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-    name: "",
-    email: "",
-    doj: "",
-    role: "Staff",
-    status: "ACTIVE",
-  });
+  const [formData, setFormData] = useState({ username: "", password: "", name: "", doj: "", role: "STAFF", roleName: "", email: "" });
   const [isCreating, setIsCreating] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  // Edit State
   const [editOpen, setEditOpen] = useState(false);
   const [editData, setEditData] = useState(null);
   const [editPassword, setEditPassword] = useState("");
   const [editError, setEditError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
-  // Load Initial Users
+  
+  const [staffSearch, setStaffSearch] = useState("");
+  const [staffRoleFilter, setStaffRoleFilter] = useState("all");
+  const [dojFrom, setDojFrom] = useState("");
+  const [dojTo, setDojTo] = useState("");
+  const [dojError, setDojError] = useState("");
+  const [sortCol, setSortCol] = useState("name");
+  const [sortDir, setSortDir] = useState("asc");
+
+  const sessionUser = (() => { try { return JSON.parse(localStorage.getItem("invigo_user") || "{}"); } catch { return {}; } })();
+  const today = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
     const fetchUsers = async () => {
       setLoadingUsers(true);
       setGlobalError("");
       try {
         const data = await getUsers();
-        // Normalize the backend ENUM (ADMIN/STAFF) to frontend casing (Admin/Staff)
         const normalizedData = data.map(user => ({
           ...user,
           role: user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase() : "Staff"
         }));
         setUsers(normalizedData);
-      }
-      catch (err) {
-        console.error("Failed to load users:", err);
+      } catch (err) {
         setGlobalError("Could not connect to the backend to load users.");
-      }
-      finally {
+      } finally {
         setLoadingUsers(false);
       }
     };
-    // Only fetch if we haven't loaded them (or if they are empty from parent init)
-    if (users.length === 0) {
-      fetchUsers();
-    }
+    const fetchRoles = async () => {
+      try {
+        const rolesData = await getRoles();
+        setAvailableRoles(rolesData);
+      } catch (err) {
+        console.error("Failed to load roles", err);
+      }
+    };
+    if (users.length === 0) fetchUsers();
+    fetchRoles();
   }, []);
+
+  const handleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("asc"); }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setError("");
@@ -263,146 +285,89 @@ const UserManagement = ({ users, setUsers }) => {
       setError("Please fill in all fields to continue.");
       return;
     }
-    const trimmedUsername = formData.username.trim();
-    if (trimmedUsername.length < 3 || trimmedUsername.length > 50) {
-      setError("Username must be between 3 and 50 characters.");
-      return;
-    }
-    if (!/^[a-zA-Z0-9._@]+$/.test(trimmedUsername)) {
-      setError("Username may only contain letters, digits, dots, underscores, and @.");
-      return;
-    }
-    if (formData.name.trim().length < 2) {
-      setError("Full name must be at least 2 characters.");
-      return;
-    }
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
     setIsCreating(true);
     try {
-      // Map role to uppercase for the Java backend Enum
+      const matchedRole = availableRoles.find(r => r.roleName === formData.roleName);
+      const roleType = matchedRole?.roleType?.toUpperCase() || "";
+      const routeRole = roleType === "ADMIN" ? "ADMIN" : "STAFF";
       const payload = {
         ...formData,
-        username: formData.username.trim(),
-        name: formData.name.trim(),
-        email: formData.email?.trim() || null,
-        role: formData.role.toUpperCase(),
-        status: formData.status || "ACTIVE",
+        role: routeRole,
+        roleName: formData.roleName,
       };
       const newUser = await createUser(payload);
-      // Ensure the returned role matches our local type casing
       if (newUser.role) {
         newUser.role = newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1).toLowerCase();
       }
       setUsers((prev) => [...prev, newUser]);
       setCreateOpen(false);
-      setFormData({ username: "", password: "", name: "", email: "", doj: "", role: "Staff", status: "ACTIVE" });
-    }
-    catch (err) {
+      setFormData({ username: "", password: "", name: "", doj: "", role: "STAFF", roleName: "", email: "" });
+    } catch (err) {
       setError(err.message || "Failed to create user");
-    }
-    finally {
+    } finally {
       setIsCreating(false);
     }
   };
+
   const openEdit = (user) => {
     setEditData({ ...user });
     setEditPassword("");
     setEditError("");
     setEditOpen(true);
   };
+
   const handleEdit = async (e) => {
     e.preventDefault();
-    if (!editData)
-      return;
-    if (!editData.username || !editData.name || !editData.doj) {
-      setEditError("Please fill in all required fields.");
-      return;
-    }
-    const trimmedUsername = editData.username.trim();
-    if (trimmedUsername.length < 3 || trimmedUsername.length > 50) {
-      setEditError("Username must be between 3 and 50 characters.");
-      return;
-    }
-    if (!/^[a-zA-Z0-9._@]+$/.test(trimmedUsername)) {
-      setEditError("Username may only contain letters, digits, dots, underscores, and @.");
-      return;
-    }
-    if (editData.name.trim().length < 2) {
-      setEditError("Full name must be at least 2 characters.");
-      return;
-    }
-    if (editPassword && editPassword.length < 6) {
-      setEditError("Password must be at least 6 characters.");
-      return;
-    }
+    if (!editData) return;
     setIsEditing(true);
     try {
-      const payload = {
-        ...editData,
-        username: editData.username.trim(),
-        name: editData.name.trim(),
-        email: editData.email?.trim() || null,
-        role: editData.role.toUpperCase(),
-      };
-      if (editPassword) {
-        payload.password = editPassword;
-      }
+      const payload = { ...editData };
+      if (editPassword) payload.password = editPassword;
+      const matchedRole = availableRoles.find(r => r.roleName === editData.roleName);
+      const roleType = matchedRole?.roleType?.toUpperCase() || "";
+      payload.role = roleType === "ADMIN" ? "ADMIN" : "STAFF";
       const updatedUser = await updateUser(editData.id, payload);
-      // Fix casing for local state
       if (updatedUser.role) {
         updatedUser.role = updatedUser.role.charAt(0).toUpperCase() + updatedUser.role.slice(1).toLowerCase();
       }
       setUsers((prev) => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
       setEditOpen(false);
-    }
-    catch (err) {
+    } catch (err) {
       setEditError(err.message || "Failed to update user");
-    }
-    finally {
+    } finally {
       setIsEditing(false);
     }
   };
+
   const handleRevoke = async (id, name) => {
-    if (confirm(`Are you sure you want to revoke network access for ${name}? This cannot be undone.`)) {
+    if (confirm(`Are you sure you want to revoke network access for ${name}?`)) {
       try {
         await deleteUser(id);
         setUsers((prev) => prev.filter(u => u.id !== id));
-      }
-      catch (err) {
+      } catch (err) {
         alert("Failed to revoke access: " + err.message);
       }
     }
   };
 
-  const handleToggleStatus = async (user) => {
-    setIsEditing(true);
-    const currentStatus = user.status || "ACTIVE";
-    const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-    try {
-      const payload = {
-        username: user.username,
-        name: user.name,
-        email: user.email || null,
-        doj: user.doj,
-        role: (user.role || "STAFF").toUpperCase(),
-        status: newStatus,
-      };
-      const updatedUser = await updateUser(user.id, payload);
+  const filteredUsers = users.filter(u => {
+    const q = staffSearch.toLowerCase();
+    const matchSearch = !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+    const matchRole = staffRoleFilter === "all" || (u.roleName || u.role) === staffRoleFilter;
+    const userDoj = u.doj ? u.doj.slice(0, 10) : "";
+    const matchFrom = !dojFrom || userDoj >= dojFrom;
+    const matchTo = !dojTo || userDoj <= dojTo;
+    return matchSearch && matchRole && matchFrom && matchTo;
+  }).sort((a, b) => {
+    let aVal, bVal;
+    if (sortCol === "name") { aVal = a.name.toLowerCase(); bVal = b.name.toLowerCase(); }
+    else if (sortCol === "role") { aVal = (a.roleName || a.role).toLowerCase(); bVal = (b.roleName || b.role).toLowerCase(); }
+    else if (sortCol === "doj") { aVal = a.doj || ""; bVal = b.doj || ""; }
+    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
 
-      // Fix casing for local state
-      if (updatedUser.role) {
-        updatedUser.role = updatedUser.role.charAt(0).toUpperCase() + updatedUser.role.slice(1).toLowerCase();
-      }
-      setUsers((prev) => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-    } catch (err) {
-      alert("Failed to update status: " + err.message);
-    } finally {
-      setIsEditing(false);
-    }
-  };
   return (<div className="space-y-10">
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
       <div>
@@ -415,12 +380,35 @@ const UserManagement = ({ users, setUsers }) => {
       </Button>
     </div>
 
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#0F172A]/30" />
+          <input
+            type="text"
+            placeholder="Search by name or username..."
+            value={staffSearch}
+            onChange={e => setStaffSearch(e.target.value)}
+            className="w-full pl-11 pr-4 h-12 rounded-2xl border border-[#0F172A]/10 bg-white text-sm font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/20"
+          />
+        </div>
+        <select
+          value={staffRoleFilter}
+          onChange={e => setStaffRoleFilter(e.target.value)}
+          className="h-12 px-4 rounded-2xl border border-[#0F172A]/10 bg-white text-sm font-bold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/20 min-w-[180px]"
+        >
+          <option value="all">All Roles</option>
+          {availableRoles.map(r => <option key={r.id} value={r.roleName}>{r.roleName}</option>)}
+        </select>
+      </div>
+    </div>
+
     {globalError && (<div className="bg-red-50 p-4 rounded-2xl flex items-center justify-between border border-red-100">
       <div className="flex items-center gap-3 text-red-600 font-bold text-sm">
         <AlertTriangle size={18} />
         {globalError}
       </div>
-      <Button size="sm" variant="outline" className="border-red-200 text-red-700 bg-white" onClick={() => window.location.reload()}>Retry Connection</Button>
+      <Button size="sm" variant="outline" onClick={() => window.location.reload()}>Retry</Button>
     </div>)}
 
     <Card className="card-premium p-0 border-none shadow-premium overflow-hidden">
@@ -428,26 +416,22 @@ const UserManagement = ({ users, setUsers }) => {
         <Table>
           <TableHeader className="bg-[#0F172A]/[0.02]">
             <TableRow className="border-[#0F172A]/5">
-              <TableHead className="px-8 font-black uppercase text-[10px] tracking-widest">Identity</TableHead>
-              <TableHead className="font-black uppercase text-[10px] tracking-widest">Email</TableHead>
-              <TableHead className="font-black uppercase text-[10px] tracking-widest">Position</TableHead>
-              <TableHead className="font-black uppercase text-[10px] tracking-widest">Entry Date</TableHead>
-              <TableHead className="font-black uppercase text-[10px] tracking-widest">Status</TableHead>
+              <TableHead className="px-8 font-black uppercase text-[10px] tracking-widest cursor-pointer" onClick={() => handleSort("name")}>Identity</TableHead>
+              <TableHead className="font-black uppercase text-[10px] tracking-widest cursor-pointer" onClick={() => handleSort("role")}>Position</TableHead>
+              <TableHead className="font-black uppercase text-[10px] tracking-widest cursor-pointer" onClick={() => handleSort("doj")}>Entry Date</TableHead>
               <TableHead className="text-right px-8 font-black uppercase text-[10px] tracking-widest">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loadingUsers ? (<TableRow>
-              <TableCell colSpan={6} className="text-center py-12">
+              <TableCell colSpan={4} className="text-center py-12">
                 <div className="w-8 h-8 mx-auto border-4 border-[#007A5E] border-t-transparent rounded-full animate-spin"></div>
-                <p className="mt-4 text-[#0F172A]/40 font-bold uppercase tracking-widest text-[10px]">Syncing with Mainframe...</p>
               </TableCell>
-            </TableRow>) : users.length === 0 && !globalError ? (<TableRow>
-              <TableCell colSpan={5} className="text-center py-12">
-                <Users size={32} className="mx-auto text-[#0F172A]/20 mb-3" />
-                <p className="text-[#0F172A]/40 font-bold text-sm">No personnel records found.</p>
+            </TableRow>) : filteredUsers.length === 0 ? (<TableRow>
+              <TableCell colSpan={4} className="text-center py-12">
+                <p className="text-[#0F172A]/40 font-bold text-sm">No records found.</p>
               </TableCell>
-            </TableRow>) : (users.map((user) => (<TableRow key={user.id} className="border-[#0F172A]/5 hover:bg-primary/[0.03] transition-colors">
+            </TableRow>) : (filteredUsers.map((user) => (<TableRow key={user.id} className="border-[#0F172A]/5 hover:bg-primary/[0.03] transition-colors">
               <TableCell className="px-8 flex items-center gap-4 py-6">
                 <div className="h-12 w-12 rounded-2xl bg-[#0F172A]/5 flex items-center justify-center font-black text-[#0F172A]/40">
                   {user.name.split(" ").map(n => n[0]).join("")}
@@ -457,44 +441,20 @@ const UserManagement = ({ users, setUsers }) => {
                   <p className="text-[10px] font-bold text-black/30">@{user.username}</p>
                 </div>
               </TableCell>
-              <TableCell className="font-bold text-sm text-[#0F172A]/60">{user.email || "-"}</TableCell>
               <TableCell>
                 <Badge className={`rounded-lg px-2 text-[10px] font-black uppercase tracking-widest border-none ${user.role === "Admin" ? "bg-purple-100 text-purple-600" : "bg-emerald-100 text-emerald-600"}`}>
-                  {user.role}
+                  {user.roleName || user.role}
                 </Badge>
               </TableCell>
               <TableCell className="font-bold text-sm text-[#0F172A]/60">
                 {new Date(user.doj).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
               </TableCell>
-              <TableCell>
-                <Badge className={`rounded-lg px-2 text-[10px] font-black uppercase tracking-widest border-none ${user.status === "ACTIVE" ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600"}`}>
-                  {user.status || "ACTIVE"}
-                </Badge>
-              </TableCell>
               <TableCell className="text-right px-8">
                 <div className="flex items-center justify-end gap-2">
-                  {user.accountLocked && (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          const updated = await unlockUser(user.id);
-                          setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-                        } catch (err) {
-                          alert(err.message);
-                        }
-                      }}
-                    >
-                      Unlock
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon" onClick={() => handleToggleStatus(user)} className={`rounded-xl transition-all ${user.status === "ACTIVE" ? "text-red-500 hover:bg-red-500/10" : "text-emerald-500 hover:bg-emerald-500/10"}`} title={user.status === "ACTIVE" ? "Deactivate User" : "Activate User"}>
-                    <Power size={16} />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(user)} className="text-[#0F172A]/40 hover:text-[#007A5E] hover:bg-[#007A5E]/10 rounded-xl transition-all" title="Edit User">
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(user)} className="text-[#0F172A]/40 hover:text-[#007A5E] hover:bg-[#007A5E]/10 rounded-xl transition-all">
                     <Edit2 size={16} />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleRevoke(user.id, user.name)} className="text-[#0F172A]/40 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all" title="Delete User">
+                  <Button variant="ghost" size="icon" onClick={() => handleRevoke(user.id, user.name)} className="text-[#0F172A]/40 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all">
                     <Trash2 size={16} />
                   </Button>
                 </div>
@@ -509,110 +469,85 @@ const UserManagement = ({ users, setUsers }) => {
       <DialogContent className="glass-dark border-white/10 p-10 max-w-xl text-white">
         <DialogHeader className="mb-8">
           <DialogTitle className="text-3xl font-black tracking-tight">Onboard Staff Member</DialogTitle>
-          <DialogDescription className="font-bold uppercase tracking-widest text-[10px] text-white/50">Create secure system credentials</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleCreate} className="space-y-6">
           {error && (<div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold p-3 rounded-xl flex items-center gap-2">
-            <AlertTriangle size={14} />
-            {error}
+            <AlertTriangle size={14} /> {error}
           </div>)}
           <div className="grid sm:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 text-white">Username</Label>
-              <Input className="rounded-2xl bg-white/5 h-12 border-white/10 focus:bg-white/10 text-white transition-none placeholder:text-white/20" placeholder="e.g. jdoe" value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} />
+              <Label className="text-[10px] font-black uppercase text-white">Username</Label>
+              <Input className="rounded-2xl bg-white/5 h-12 border-white/10 text-white" placeholder="jdoe" value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 text-white">Pin / Password</Label>
-              <div className="relative">
-                <Input type={showPassword ? "text" : "password"} className="rounded-2xl bg-white/5 h-12 border-white/10 focus:bg-white/10 text-white transition-none pr-10 placeholder:text-white/20" placeholder="••••••••" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors p-1">
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+              <Label className="text-[10px] font-black uppercase text-white">Password</Label>
+              <Input type="password" className="rounded-2xl bg-white/5 h-12 border-white/10 text-white" placeholder="••••••••" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 text-white">Full Name</Label>
-            <Input className="rounded-2xl bg-white/5 h-12 border-white/10 text-white placeholder:text-white/20" placeholder="John Doe" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+            <Label className="text-[10px] font-black uppercase text-white">Full Name</Label>
+            <Input className="rounded-2xl bg-white/5 h-12 border-white/10 text-white" placeholder="John Doe" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
           </div>
-          <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 text-white">Joining Date</Label>
-            {/* Added specifically [color-scheme:dark] to make the calendar icon visible on some browsers */}
-            <Input type="date" className="rounded-2xl bg-white/5 h-12 border-white/10 text-white [color-scheme:dark]" value={formData.doj} onChange={e => setFormData({ ...formData, doj: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 text-white">System Permissions</Label>
-            <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
-              <SelectTrigger className="rounded-2xl bg-white/5 h-12 border-white/10 font-bold text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl bg-[#0F172A] text-white border-white/10">
-                <SelectItem value="Staff">Warehouse Staff</SelectItem>
-                <SelectItem value="Admin">System Administrator</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid sm:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-white">Joining Date</Label>
+              <Input type="date" className="rounded-2xl bg-white/5 h-12 border-white/10 text-white [color-scheme:dark]" value={formData.doj} onChange={e => setFormData({ ...formData, doj: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-white">Role Policy</Label>
+              <Select value={formData.roleName} onValueChange={(v) => setFormData({ ...formData, roleName: v })}>
+                <SelectTrigger className="rounded-2xl bg-white/5 h-12 border-white/10 text-white">
+                  <SelectValue placeholder="Select Role" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0F172A] text-white">
+                  {availableRoles.map(r => <SelectItem key={r.id} value={r.roleName}>{r.roleName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter className="pt-6">
-            <Button disabled={isCreating} type="submit" className="w-full py-8 rounded-[2rem] bg-[#007A5E] text-white font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl border-none disabled:opacity-50">
-              {isCreating ? "Configuring Access..." : "Activate Professional Account"}
+            <Button disabled={isCreating} type="submit" className="w-full py-8 rounded-[2rem] bg-[#007A5E] text-white font-black text-xl hover:scale-[1.02] transition-all">
+              {isCreating ? "Configuring..." : "Activate Account"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
 
-    {/* Edit Staff Dialog */}
     <Dialog open={editOpen} onOpenChange={setEditOpen}>
       <DialogContent className="glass-dark border-white/10 p-10 max-w-xl text-white">
         <DialogHeader className="mb-8">
           <DialogTitle className="text-3xl font-black tracking-tight">Edit Staff Member</DialogTitle>
-          <DialogDescription className="font-bold uppercase tracking-widest text-[10px] text-white/50">Update system credentials and permissions</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleEdit} className="space-y-6">
-          {editError && (<div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold p-3 rounded-xl flex items-center gap-2">
-            <AlertTriangle size={14} />
-            {editError}
-          </div>)}
-          <div className="grid sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 text-white">Full Name</Label>
-              <Input className="rounded-2xl bg-white/5 h-12 border-white/10 text-white placeholder:text-white/20" value={editData?.name || ""} onChange={e => setEditData(prev => prev ? { ...prev, name: e.target.value } : null)} />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 text-white">Password Override</Label>
-              <div className="relative">
-                <Input type={showPassword ? "text" : "password"} className="rounded-2xl bg-white/5 h-12 border-white/10 focus:bg-white/10 text-white transition-none pr-10 placeholder:text-white/20" placeholder="Type to change pass" value={editPassword} onChange={e => setEditPassword(e.target.value)} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors p-1">
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
+          {editError && (<div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold p-3 rounded-xl"> {editError} </div>)}
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase text-white">Full Name</Label>
+            <Input className="rounded-2xl bg-white/5 h-12 border-white/10 text-white" value={editData?.name || ""} onChange={e => setEditData(prev => prev ? { ...prev, name: e.target.value } : null)} />
           </div>
-
           <div className="grid sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 text-white">Joining Date</Label>
+             <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-white">Joining Date</Label>
               <Input type="date" className="rounded-2xl bg-white/5 h-12 border-white/10 text-white [color-scheme:dark]" value={editData?.doj || ""} onChange={e => setEditData(prev => prev ? { ...prev, doj: e.target.value } : null)} />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 text-white">System Permissions</Label>
-              <Select value={editData?.role || "Staff"} onValueChange={(v) => setEditData(prev => prev ? { ...prev, role: v } : null)}>
-                <SelectTrigger className="rounded-2xl bg-white/5 h-12 border-white/10 font-bold text-white">
+              <Label className="text-[10px] font-black uppercase text-white">Role Policy</Label>
+              <Select value={editData?.roleName || ""} onValueChange={(v) => setEditData(prev => prev ? { ...prev, roleName: v } : null)}>
+                <SelectTrigger className="rounded-2xl bg-white/5 h-12 border-white/10 text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl bg-[#0F172A] text-white border-white/10">
-                  <SelectItem value="Staff">Warehouse Staff</SelectItem>
-                  <SelectItem value="Admin">System Administrator</SelectItem>
+                <SelectContent className="bg-[#0F172A] text-white">
+                  {availableRoles.map(r => <SelectItem key={r.id} value={r.roleName}>{r.roleName}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
-
+           <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-white">Password Override (Optional)</Label>
+              <Input type="password" className="rounded-2xl bg-white/5 h-12 border-white/10 text-white" value={editPassword} onChange={e => setEditPassword(e.target.value)} />
+            </div>
           <DialogFooter className="pt-6">
-            <Button disabled={isEditing} type="button" variant="ghost" onClick={() => setEditOpen(false)} className="py-8 rounded-[2rem] text-white hover:bg-white/5 font-black text-lg transition-all border-none px-8">
-              Cancel
-            </Button>
-            <Button disabled={isEditing} type="submit" className="flex-1 py-8 rounded-[2rem] bg-[#7C3AED] text-white font-black text-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-glow-amethyst border-none disabled:opacity-50">
+            <Button disabled={isEditing} type="submit" className="w-full py-8 rounded-[2rem] bg-[#7C3AED] text-white font-black text-xl hover:scale-[1.02] transition-all">
               {isEditing ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
@@ -621,8 +556,6 @@ const UserManagement = ({ users, setUsers }) => {
     </Dialog>
   </div>);
 };
-import ReportsManagement from "./ReportsManagement";
-import AIRiskReport from "./AIRiskReport";
 
 const Admin = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -631,6 +564,10 @@ const Admin = () => {
   const getPageTitle = () => {
     if (location.pathname === "/admin/users")
       return "User Management";
+    if (location.pathname === "/admin/roles")
+      return "Role Management";
+    if (location.pathname === "/admin/security")
+      return "Security Audit Log";
     if (location.pathname === "/admin/inventory")
       return "Inventory Suite";
     if (location.pathname === "/admin/discounts")
@@ -662,6 +599,8 @@ const Admin = () => {
             <motion.div key={location.pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
               {(() => {
                 if (location.pathname === "/admin/users") return <UserManagement users={users} setUsers={setUsers} />;
+                if (location.pathname === "/admin/roles") return <RoleManagement />;
+                if (location.pathname === "/admin/security") return <SecurityActivity users={users} setUsers={setUsers} />;
                 if (location.pathname === "/admin/sales") return <SalesModule role="Admin" />;
                 if (location.pathname === "/admin/inventory") return <InventoryPage role="Admin" />;
                 if (location.pathname === "/admin/discounts") return <DiscountsPage role="Admin" />;

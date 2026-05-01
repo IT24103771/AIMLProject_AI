@@ -18,14 +18,19 @@ public class AuthController {
     private final UserService userService;
     private final JwtService jwtService;
     private final OtpService otpService;
+    private final LoginHistoryService loginHistoryService;
+    private final RoleRepository roleRepository;
 
     @Value("${app.max-login-attempts:3}")
     private int maxLoginAttempts;
 
-    public AuthController(UserService userService, JwtService jwtService, OtpService otpService) {
+    public AuthController(UserService userService, JwtService jwtService, OtpService otpService,
+                          LoginHistoryService loginHistoryService, RoleRepository roleRepository) {
         this.userService = userService;
         this.jwtService = jwtService;
         this.otpService = otpService;
+        this.loginHistoryService = loginHistoryService;
+        this.roleRepository = roleRepository;
     }
 
     @PostMapping("/login")
@@ -35,6 +40,9 @@ public class AuthController {
         String username = credentials.get("username");
         String password = credentials.get("password");
 
+        String ipAddress = request.getRemoteAddr();
+        String deviceBrowser = request.getHeader("User-Agent");
+
         if (username == null || password == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Username and password required"));
         }
@@ -42,6 +50,7 @@ public class AuthController {
         Optional<User> userOpt = userService.findByUsername(username.trim());
 
         if (userOpt.isEmpty()) {
+            loginHistoryService.recordLogin(username, "Unknown", ipAddress, deviceBrowser, "Failed");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Invalid credentials"));
         }
@@ -49,11 +58,13 @@ public class AuthController {
         User matchingUser = userOpt.get();
 
         if (matchingUser.isAccountLocked()) {
+            loginHistoryService.recordLogin(username, matchingUser.getName(), ipAddress, deviceBrowser, "Failed (Locked)");
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message", "Account locked. Please contact admin."));
         }
 
         if (!"ACTIVE".equalsIgnoreCase(matchingUser.getStatus())) {
+            loginHistoryService.recordLogin(username, matchingUser.getName(), ipAddress, deviceBrowser, "Failed (Deactivated)");
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message", "Account is deactivated. Please contact admin."));
         }
@@ -62,6 +73,26 @@ public class AuthController {
 
         if (authenticatedUser.isPresent()) {
             User loggedInUser = authenticatedUser.get();
+
+            String submittedRole = credentials.get("role");
+            String actualRoleName = loggedInUser.getRoleName();
+            if (submittedRole != null && !submittedRole.isBlank()
+                    && actualRoleName != null && !actualRoleName.isBlank()) {
+                boolean roleMatches = submittedRole.trim().equalsIgnoreCase(actualRoleName.trim());
+                if (!roleMatches && submittedRole.trim().equalsIgnoreCase("Admin")) {
+                    Optional<Role> userRole = roleRepository.findAll().stream()
+                        .filter(r -> r.getRoleName().equalsIgnoreCase(actualRoleName))
+                        .findFirst();
+                    roleMatches = userRole.isPresent()
+                        && ("ADMIN".equalsIgnoreCase(userRole.get().getRoleType())
+                            || "SUB_ADMIN".equalsIgnoreCase(userRole.get().getRoleType()));
+                }
+                if (!roleMatches) {
+                    loginHistoryService.recordLogin(username, loggedInUser.getName(), ipAddress, deviceBrowser, "Failed (Role Mismatch)");
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(Map.of("message", "Role does not match your account. Access denied."));
+                }
+            }
 
             loggedInUser.setFailedLoginAttempts(0);
             userService.saveUser(loggedInUser);
@@ -83,6 +114,47 @@ public class AuthController {
             response.put("token", token);
             response.put("message", "Login successful");
 
+            java.util.List<Role> allRoles = roleRepository.findAll();
+            String userRoleEnum = loggedInUser.getRole().name();
+            String specificRoleName = loggedInUser.getRoleName();
+
+            Optional<Role> matchedRole = (specificRoleName != null && !specificRoleName.isEmpty())
+                ? allRoles.stream().filter(r -> r.getRoleName().equalsIgnoreCase(specificRoleName)).findFirst()
+                : allRoles.stream()
+                    .filter(r -> r.getRoleName().toUpperCase().contains(userRoleEnum)
+                              || userRoleEnum.contains(r.getRoleName().toUpperCase()))
+                    .findFirst();
+
+            Map<String, Boolean> permissions = new HashMap<>();
+            if (matchedRole.isPresent()) {
+                Role r = matchedRole.get();
+                permissions.put("inventoryTracking", r.isInventoryTracking());
+                permissions.put("productManagement", r.isProductManagement());
+                permissions.put("salesManagement",   r.isSalesManagement());
+                permissions.put("discountsAlerts",   r.isDiscountsAlerts());
+                permissions.put("reportAnalytics",   r.isReportAnalytics());
+                permissions.put("userControl",       r.isUserControl());
+                permissions.put("addUpdateStock",    r.isAddUpdateStock());
+            } else if ("ADMIN".equals(userRoleEnum) || "OWNER".equals(userRoleEnum)) {
+                permissions.put("inventoryTracking", true);
+                permissions.put("productManagement", true);
+                permissions.put("salesManagement",   true);
+                permissions.put("discountsAlerts",   true);
+                permissions.put("reportAnalytics",   true);
+                permissions.put("userControl",       true);
+                permissions.put("addUpdateStock",    true);
+            } else {
+                permissions.put("inventoryTracking", false);
+                permissions.put("productManagement", false);
+                permissions.put("salesManagement",   false);
+                permissions.put("discountsAlerts",   false);
+                permissions.put("reportAnalytics",   false);
+                permissions.put("userControl",       false);
+                permissions.put("addUpdateStock",    false);
+            }
+            response.put("permissions", permissions);
+
+            loginHistoryService.recordLogin(username, loggedInUser.getName(), ipAddress, deviceBrowser, "Success");
             return ResponseEntity.ok(response);
         }
 
@@ -96,6 +168,7 @@ public class AuthController {
         }
 
         userService.saveUser(matchingUser);
+        loginHistoryService.recordLogin(username, matchingUser.getName(), ipAddress, deviceBrowser, "Failed");
 
         if (lockedNow) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)

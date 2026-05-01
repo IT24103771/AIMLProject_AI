@@ -7,7 +7,6 @@ const API = "/api";
 
 const RISK_CONFIG = {
   HIGH:   { label: "HIGH",   code: 1, bg: "#FEE2E2", color: "#DC2626", dot: "#EF4444" },
-  NORMAL: { label: "NORMAL", code: 2, bg: "#FEF3C7", color: "#D97706", dot: "#F59E0B" },
   LOW:    { label: "LOW",    code: 0, bg: "#D1FAE5", color: "#059669", dot: "#10B981" },
 };
 
@@ -32,7 +31,7 @@ const AIRiskReport = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
   const [search, setSearch]   = useState("");
-  const [filter, setFilter]   = useState("ALL");   // ALL | HIGH | NORMAL | LOW
+  const [filter, setFilter]   = useState("ALL");   // ALL | HIGH | LOW
   const [groupBy, setGroupBy] = useState(false);
   const [sortField, setSortField]   = useState("daysLeft");
   const [sortAsc, setSortAsc]       = useState(true);
@@ -95,7 +94,6 @@ const AIRiskReport = () => {
   const counts = useMemo(() => ({
     total:  data.length,
     high:   data.filter(r => r.riskLabel === "HIGH").length,
-    normal: data.filter(r => r.riskLabel === "NORMAL").length,
     low:    data.filter(r => r.riskLabel === "LOW").length,
   }), [data]);
 
@@ -192,11 +190,10 @@ const AIRiskReport = () => {
       </div>
 
       {/* KPI row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 28 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
         {[
           { label: "Total Batches", value: counts.total, bg: "#e0e7ff", col: "#4338ca" },
           { label: "High Risk",    value: counts.high,   bg: "#FEE2E2", col: "#DC2626" },
-          { label: "Normal Risk",  value: counts.normal, bg: "#FEF3C7", col: "#D97706" },
           { label: "Low Risk",     value: counts.low,    bg: "#D1FAE5", col: "#059669" },
         ].map(k => (
           <div key={k.label} style={{ background: "#fff", border: "1px solid #f1f5f9", borderRadius: 20, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)", cursor: "pointer", transition: "transform 0.2s" }}
@@ -219,10 +216,10 @@ const AIRiskReport = () => {
           onChange={e => setSearch(e.target.value)}
           style={{ flex: 1, minWidth: 200, height: 40, border: "1px solid #e2e8f0", borderRadius: 12, padding: "0 14px", fontSize: 13, fontWeight: 600, outline: "none" }}
         />
-        {["ALL","HIGH","NORMAL","LOW"].map(f => (
+        {["ALL","HIGH","LOW"].map(f => (
           <button key={f} onClick={() => setFilter(f)}
             style={{ padding: "8px 18px", borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12, letterSpacing: "0.05em",
-              background: filter === f ? (f === "HIGH" ? "#EF4444" : f === "NORMAL" ? "#F59E0B" : f === "LOW" ? "#10B981" : "#0f172a") : "#f8fafc",
+              background: filter === f ? (f === "HIGH" ? "#EF4444" : f === "LOW" ? "#10B981" : "#0f172a") : "#f8fafc",
               color: filter === f ? "#fff" : "#64748b", transition: "all 0.2s" }}>
             {f === "ALL" ? "All" : f}
           </button>

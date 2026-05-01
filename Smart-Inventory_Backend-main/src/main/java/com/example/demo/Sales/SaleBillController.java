@@ -118,4 +118,14 @@ public class SaleBillController {
             return ResponseEntity.badRequest().body(null);
         }
     }
+
+    @GetMapping("/check-duplicate")
+    public ResponseEntity<Map<String, Boolean>> checkDuplicate(
+            @RequestParam Long productId,
+            @RequestParam String saleDate,
+            @RequestParam Integer quantity,
+            @RequestParam(required = false) String customerName) {
+        boolean isDuplicate = saleBillService.isDuplicateSale(productId, java.time.LocalDate.parse(saleDate), quantity, customerName);
+        return ResponseEntity.ok(Map.of("isDuplicate", isDuplicate));
+    }
 }

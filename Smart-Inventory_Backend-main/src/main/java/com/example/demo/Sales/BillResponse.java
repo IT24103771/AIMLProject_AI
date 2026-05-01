@@ -19,6 +19,8 @@ public class BillResponse {
     private LocalDateTime voidedAt;
     private String voidedBy;
     private String voidReason;
+    private String customerName;
+    private String customerEmail;
     private List<LineResponse> lines;
 
     public BillResponse() {}
@@ -62,6 +64,12 @@ public class BillResponse {
 
     public String getVoidReason() { return voidReason; }
     public void setVoidReason(String voidReason) { this.voidReason = voidReason; }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public String getCustomerEmail() { return customerEmail; }
+    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
 
     public List<LineResponse> getLines() { return lines; }
     public void setLines(List<LineResponse> lines) { this.lines = lines; }

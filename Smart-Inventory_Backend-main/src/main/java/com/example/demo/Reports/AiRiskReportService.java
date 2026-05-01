@@ -42,20 +42,27 @@ public class AiRiskReportService {
                 riskCode = 2;
                 riskLabel = "NORMAL";
             } else {
-                // Fallback: compute from days and sales velocity
+                // Logic: ratio = remainingQty / expectedSales
+                // expectedSales = velocity * daysLeft
                 Long productId = inv.getProduct().getProductId();
                 LocalDate sevenDaysAgo = today.minusDays(7);
                 Long soldLast7 = saleRepository.getTotalQuantitySoldByProductIdAfter(productId, sevenDaysAgo);
-                double velocity = soldLast7 != null ? soldLast7 / 7.0 : 0.0;
-                int qty = inv.getQuantity() != null ? inv.getQuantity() : 0;
-                double expectedSales = velocity * Math.max(daysLeft, 0);
+                
+                double velocity = (soldLast7 != null) ? (soldLast7 / 7.0) : 0.0;
+                if (velocity <= 0) velocity = 1.0; // avoid zero as per user requirement
 
-                if (daysLeft < 0) {
+                int qty = inv.getQuantity() != null ? inv.getQuantity() : 0;
+                long safeDays = Math.max(daysLeft, 1); // avoid division by zero
+                double expectedSales = velocity * safeDays;
+                
+                double ratio = qty / expectedSales;
+
+                if (qty == 0) {
+                    riskCode = 0; riskLabel = "LOW";
+                } else if (daysLeft < 0) {
+                    riskCode = 1; riskLabel = "HIGH"; // already expired
+                } else if (ratio > 1.0) {
                     riskCode = 1; riskLabel = "HIGH";
-                } else if (daysLeft <= 3 || (qty > 0 && expectedSales < qty * 0.3)) {
-                    riskCode = 1; riskLabel = "HIGH";
-                } else if (daysLeft <= 7) {
-                    riskCode = 2; riskLabel = "NORMAL";
                 } else {
                     riskCode = 0; riskLabel = "LOW";
                 }

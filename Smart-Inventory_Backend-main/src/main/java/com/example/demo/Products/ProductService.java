@@ -123,6 +123,7 @@ public class ProductService {
         LocalDate sevenDaysAgo = LocalDate.now().minusDays(7);
         Long soldLast7Days = saleRepository.getTotalQuantitySoldByProductIdAfter(id, sevenDaysAgo);
         double salesVelocity = (soldLast7Days != null) ? soldLast7Days / 7.0 : 0.0;
+        if (salesVelocity <= 0) salesVelocity = 1.0; // User Step 2: fallback to 1
         requestBody.put("sales_velocity", salesVelocity);
 
         String url = FLASK_API_URL + "/predict";

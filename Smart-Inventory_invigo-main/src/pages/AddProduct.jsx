@@ -4,6 +4,7 @@ import { ArrowLeft, Save, X, Upload, Pencil, ChevronDown, ClipboardList, Package
 import { authFetch } from "@/lib/api";
 import CustomSelect from "../components/CustomSelect";
 import { MAIN_CATEGORIES, SUB_CATEGORIES, validateProduct } from "../lib/product-constants";
+import FileUploadModal from "../components/FileUploadModal";
 import "../styles/Products.css";
 
 const API = "/api/products";
@@ -26,6 +27,7 @@ const AddProduct = () => {
     const [products, setProducts] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingProductId, setEditingProductId] = useState(null);
+    const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
     const handleEditClick = (item) => {
         setEditingProductId(item.productId || item.id);
@@ -288,12 +290,20 @@ const AddProduct = () => {
                             <button
                                 type="button"
                                 className="px-4 py-3 rounded-2xl bg-[#0F172A]/10 text-[#0F172A] font-bold text-sm flex items-center gap-2 outline-none"
-                                onClick={() => alert("File upload modal placeholder")}
+                                onClick={() => setUploadModalOpen(true)}
                             >
                                 <Upload size={14} /> Upload
                             </button>
                         </div>
                     </div>
+
+                    <FileUploadModal
+                        isOpen={uploadModalOpen}
+                        onClose={() => setUploadModalOpen(false)}
+                        title="Upload Product Image"
+                        accept="image/*"
+                        onUpload={(url) => setForm(prev => ({ ...prev, imageUrl: url }))}
+                    />
 
                     <div className="products-form-actions-2col mt-4 border-t border-[#0F172A]/5 pt-6">
                         <button

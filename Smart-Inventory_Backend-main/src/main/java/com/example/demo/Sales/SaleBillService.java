@@ -55,6 +55,8 @@ public class SaleBillService {
         bill.setSaleDate(req.getSaleDate());
         bill.setNotes(req.getNotes());
         bill.setCreatedBy(username);
+        bill.setCustomerName(req.getCustomerName());
+        bill.setCustomerEmail(req.getCustomerEmail());
         bill.setStatus(BillStatus.DRAFT);
 
         if (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank()) {
@@ -64,27 +66,7 @@ public class SaleBillService {
         bill = billRepository.save(bill);
 
         // Create line items (no stock deduction yet for drafts)
-        for (CreateBillRequest.BillLineRequest lineReq : req.getLines()) {
-            Product product = productRepository.findById(lineReq.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found: " + lineReq.getProductId()));
-            Inventory batch = inventoryRepository.findById(lineReq.getBatchId())
-                    .orElseThrow(() -> new RuntimeException("Batch not found: " + lineReq.getBatchId()));
-
-            validateBatchBelongsToProduct(product, batch);
-
-            Sale line = new Sale();
-            line.setSaleBill(bill);
-            line.setProduct(product);
-            line.setInventoryBatch(batch);
-            line.setQuantity(lineReq.getQuantity());
-            line.setSaleDate(req.getSaleDate());
-            line.setCreatedBy(username);
-
-            // Pre-calculate pricing for display (snapshot at create time)
-            applyPricingAndDiscount(line, product, batch, lineReq.getQuantity());
-
-            saleRepository.save(line);
-        }
+        createLineItems(bill, req.getLines(), username);
 
         bill = billRepository.findById(bill.getId()).orElseThrow();
 
@@ -111,31 +93,14 @@ public class SaleBillService {
 
         bill.setSaleDate(req.getSaleDate());
         bill.setNotes(req.getNotes());
+        bill.setCustomerName(req.getCustomerName());
+        bill.setCustomerEmail(req.getCustomerEmail());
 
         // Remove existing lines and replace
         List<Sale> existingLines = saleRepository.findBySaleBillId(billId);
         saleRepository.deleteAll(existingLines);
 
-        for (CreateBillRequest.BillLineRequest lineReq : req.getLines()) {
-            Product product = productRepository.findById(lineReq.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found: " + lineReq.getProductId()));
-            Inventory batch = inventoryRepository.findById(lineReq.getBatchId())
-                    .orElseThrow(() -> new RuntimeException("Batch not found: " + lineReq.getBatchId()));
-
-            validateBatchBelongsToProduct(product, batch);
-
-            Sale line = new Sale();
-            line.setSaleBill(bill);
-            line.setProduct(product);
-            line.setInventoryBatch(batch);
-            line.setQuantity(lineReq.getQuantity());
-            line.setSaleDate(req.getSaleDate());
-            line.setCreatedBy(username);
-
-            applyPricingAndDiscount(line, product, batch, lineReq.getQuantity());
-
-            saleRepository.save(line);
-        }
+        createLineItems(bill, req.getLines(), username);
 
         // Recalculate total
         recalculateBillTotal(bill);
@@ -156,6 +121,60 @@ public class SaleBillService {
         }
 
         return finalizeBillInternal(bill, username);
+    }
+
+    private void createLineItems(SaleBill bill, List<CreateBillRequest.BillLineRequest> lineRequests, String username) {
+        for (CreateBillRequest.BillLineRequest lineReq : lineRequests) {
+            Product product = productRepository.findById(lineReq.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found: " + lineReq.getProductId()));
+            
+            if (lineReq.getBatchId() == null) {
+                // FEFO Selection
+                List<Inventory> availableBatches = inventoryRepository.findAvailableBatchesByProductId(product.getProductId());
+                int remaining = lineReq.getQuantity();
+                
+                int totalAvailable = availableBatches.stream().mapToInt(Inventory::getQuantity).sum();
+                if (remaining > totalAvailable) {
+                    throw new RuntimeException("Insufficient stock for product " + product.getProductName() + 
+                        ". Requested: " + remaining + ", Available: " + totalAvailable);
+                }
+                
+                for (Inventory batch : availableBatches) {
+                    if (remaining <= 0) break;
+                    
+                    int qtyFromBatch = Math.min(batch.getQuantity(), remaining);
+                    remaining -= qtyFromBatch;
+                    
+                    Sale line = new Sale();
+                    line.setSaleBill(bill);
+                    line.setProduct(product);
+                    line.setInventoryBatch(batch);
+                    line.setQuantity(qtyFromBatch);
+                    line.setSaleDate(bill.getSaleDate());
+                    line.setCreatedBy(username);
+                    
+                    applyPricingAndDiscount(line, product, batch, qtyFromBatch);
+                    saleRepository.save(line);
+                }
+            } else {
+                // Explicit Batch Selection
+                Inventory batch = inventoryRepository.findById(lineReq.getBatchId())
+                        .orElseThrow(() -> new RuntimeException("Batch not found: " + lineReq.getBatchId()));
+    
+                validateBatchBelongsToProduct(product, batch);
+    
+                Sale line = new Sale();
+                line.setSaleBill(bill);
+                line.setProduct(product);
+                line.setInventoryBatch(batch);
+                line.setQuantity(lineReq.getQuantity());
+                line.setSaleDate(bill.getSaleDate());
+                line.setCreatedBy(username);
+    
+                applyPricingAndDiscount(line, product, batch, lineReq.getQuantity());
+                saleRepository.save(line);
+            }
+        }
     }
 
     private BillResponse finalizeBillInternal(SaleBill bill, String username) {
@@ -248,6 +267,10 @@ public class SaleBillService {
         billRepository.delete(bill);
     }
 
+    public boolean isDuplicateSale(Long productId, java.time.LocalDate saleDate, Integer quantity, String customerName) {
+        return saleRepository.isDuplicateSale(productId, saleDate, quantity, customerName);
+    }
+
     // ─── Get Single Bill ───────────────────────────────────────────────────────
 
     public BillResponse getBill(Long billId) {
@@ -313,7 +336,6 @@ public class SaleBillService {
         }
         for (CreateBillRequest.BillLineRequest line : req.getLines()) {
             if (line.getProductId() == null) throw new RuntimeException("Product is required for every line.");
-            if (line.getBatchId() == null) throw new RuntimeException("Batch is required for every line.");
             if (line.getQuantity() == null || line.getQuantity() < 1)
                 throw new RuntimeException("Quantity must be at least 1 for every line.");
         }
@@ -380,6 +402,8 @@ public class SaleBillService {
         resp.setVoidedAt(bill.getVoidedAt());
         resp.setVoidedBy(bill.getVoidedBy());
         resp.setVoidReason(bill.getVoidReason());
+        resp.setCustomerName(bill.getCustomerName());
+        resp.setCustomerEmail(bill.getCustomerEmail());
 
         List<Sale> lines = saleRepository.findBySaleBillId(bill.getId());
         resp.setLines(lines.stream().map(this::toLineResponse).toList());

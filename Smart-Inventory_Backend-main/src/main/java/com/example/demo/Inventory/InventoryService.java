@@ -166,7 +166,6 @@ public class InventoryService {
         
         // Prioritize AI Risk Level
         if ("HIGH".equalsIgnoreCase(riskLevel)) return "HIGH RISK";
-        if ("NORMAL".equalsIgnoreCase(riskLevel)) return "NORMAL RISK";
         
         if (!expiry.isAfter(today.plusDays(7))) return "Expiring Soon";
         return "Safe";

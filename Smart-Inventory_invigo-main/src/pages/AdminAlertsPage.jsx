@@ -52,7 +52,6 @@ export default function AdminAlertsPage() {
 
   const getRiskBadgeInfo = (riskLevel) => {
     if (riskLevel === "HIGH") return { label: "High Risk", class: "bg-red-100 text-red-600" };
-    if (riskLevel === "MEDIUM") return { label: "Medium Risk", class: "bg-orange-100 text-orange-600" };
     return { label: "Low Risk", class: "bg-emerald-100 text-emerald-600" };
   };
 

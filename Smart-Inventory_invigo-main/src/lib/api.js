@@ -113,6 +113,59 @@ export const unlockUser = async (id) => {
     return data;
 };
 
+// ROLES
+export const getRoles = async () => {
+    const response = await authFetch(`${API_BASE_URL}/admin/roles`);
+    const data = await response.json().catch(() => []);
+
+    if (!response.ok) {
+        throw new Error(data.message || "Failed to fetch roles");
+    }
+
+    return data;
+};
+
+export const createRole = async (roleData) => {
+    const response = await authFetch(`${API_BASE_URL}/admin/roles`, {
+        method: "POST",
+        body: JSON.stringify(roleData),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.message || "Failed to create role");
+    }
+
+    return data;
+};
+
+export const updateRole = async (id, roleData) => {
+    const response = await authFetch(`${API_BASE_URL}/admin/roles/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(roleData),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.message || "Failed to update role");
+    }
+
+    return data;
+};
+
+export const deleteRole = async (id) => {
+    const response = await authFetch(`${API_BASE_URL}/admin/roles/${id}`, {
+        method: "DELETE",
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to delete role");
+    }
+};
+
 // STAFF PROFILE
 export const getStaffProfile = async (id) => {
     const response = await authFetch(`${API_BASE_URL}/staff/profile/${id}`);
@@ -184,6 +237,18 @@ export const resetPassword = async (email, otp, newPassword) => {
 
     if (!response.ok) {
         throw new Error(data.message || "Password reset failed");
+    }
+
+    return data;
+};
+
+// LOGIN HISTORY
+export const getLoginHistory = async () => {
+    const response = await authFetch(`${API_BASE_URL}/logins`);
+    const data = await response.json().catch(() => []);
+
+    if (!response.ok) {
+        throw new Error(data.message || "Failed to fetch login history");
     }
 
     return data;

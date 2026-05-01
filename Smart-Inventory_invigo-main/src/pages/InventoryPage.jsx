@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { authFetch } from "@/lib/api";
+import FileUploadModal from "../components/FileUploadModal";
+import { Upload } from "lucide-react";
 import "../styles/Inventory.css";
 
 const API = "/api";
@@ -10,6 +12,7 @@ const InventoryPage = ({ role = "Staff" }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     productId: "",
@@ -186,7 +189,23 @@ const InventoryPage = ({ role = "Staff" }) => {
             Add stock batches with expiry dates (batches expire, products don’t).
           </p>
         </div>
+        <div className="flex items-center gap-4">
+          <button 
+            className="btn btn-ghost flex items-center gap-2"
+            onClick={() => setImportModalOpen(true)}
+          >
+            <Upload size={16} /> Bulk Import
+          </button>
+        </div>
       </div>
+
+      <FileUploadModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        title="Bulk Inventory Import"
+        accept=".csv,.xlsx"
+        onUpload={(file) => console.log("Processing bulk import...", file)}
+      />
 
       {error && <div className="banner">{error}</div>}
 

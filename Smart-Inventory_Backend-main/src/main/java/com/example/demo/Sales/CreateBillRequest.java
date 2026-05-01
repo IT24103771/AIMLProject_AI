@@ -19,6 +19,10 @@ public class CreateBillRequest {
 
     private boolean finalize = false;
 
+    private String customerName;
+
+    private String customerEmail;
+
     @NotEmpty(message = "At least one line item is required")
     @Valid
     private List<BillLineRequest> lines;
@@ -38,11 +42,16 @@ public class CreateBillRequest {
     public List<BillLineRequest> getLines() { return lines; }
     public void setLines(List<BillLineRequest> lines) { this.lines = lines; }
 
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public String getCustomerEmail() { return customerEmail; }
+    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
+
     public static class BillLineRequest {
         @NotNull(message = "Product is required")
         private Long productId;
 
-        @NotNull(message = "Batch is required")
         private Long batchId;
 
         @NotNull(message = "Quantity is required")

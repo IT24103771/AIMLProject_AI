@@ -34,4 +34,17 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 
     @Query("SELECT COALESCE(SUM(s.quantity), 0) FROM Sale s WHERE s.product.productId = :productId AND s.saleDate >= :startDate")
     Long getTotalQuantitySoldByProductIdAfter(@Param("productId") Long productId, @Param("startDate") LocalDate startDate);
+
+    @Query("""
+            SELECT COUNT(s) > 0 FROM Sale s
+            WHERE s.product.productId = :productId
+              AND s.saleDate = :saleDate
+              AND s.quantity = :quantity
+              AND (:customerName IS NULL OR s.saleBill.customerName = :customerName)
+              AND (s.saleBill IS NULL OR s.saleBill.status = 'FINALIZED')
+           """)
+    boolean isDuplicateSale(@Param("productId") Long productId,
+                            @Param("saleDate") LocalDate saleDate,
+                            @Param("quantity") Integer quantity,
+                            @Param("customerName") String customerName);
 }

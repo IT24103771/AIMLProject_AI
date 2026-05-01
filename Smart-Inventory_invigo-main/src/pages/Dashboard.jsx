@@ -199,12 +199,11 @@ const Dashboard = () => {
       const risk = p.riskLevel || "LOW";
       
       if (!byCategory.has(cat)) {
-        byCategory.set(cat, { category: cat, HIGH: 0, NORMAL: 0, LOW: 0 });
+        byCategory.set(cat, { category: cat, HIGH: 0, LOW: 0 });
       }
       
       const stats = byCategory.get(cat);
       if (risk === "HIGH") stats.HIGH += 1;
-      else if (risk === "NORMAL" || risk === "MEDIUM") stats.NORMAL += 1;
       else stats.LOW += 1;
     });
 
@@ -431,8 +430,7 @@ const Dashboard = () => {
                           <span
                             className={
                               "pill " +
-                              (x.riskLevel === "HIGH" ? "pill-bad" : 
-                               (x.riskLevel === "NORMAL" || x.riskLevel === "MEDIUM") ? "pill-warn" : "pill-good")
+                              (x.riskLevel === "HIGH" ? "pill-bad" : "pill-good")
                             }
                             title={x.riskProbability ? `Probability: ${Math.round(x.riskProbability * 100)}%` : ""}
                           >
@@ -539,7 +537,6 @@ const Dashboard = () => {
                     <Pie
                       data={[
                         { name: "High Risk", value: products.filter(p => p.riskLevel === "HIGH").length, color: "#EF4444" },
-                        { name: "Normal Risk", value: products.filter(p => p.riskLevel === "NORMAL" || p.riskLevel === "MEDIUM").length, color: "#F59E0B" },
                         { name: "Low Risk", value: products.filter(p => !p.riskLevel || p.riskLevel === "LOW").length, color: "#10B981" }
                       ].filter(d => d.value > 0)}
                       dataKey="value"
@@ -555,7 +552,6 @@ const Dashboard = () => {
                       {
                         [
                           { name: "High Risk", value: products.filter(p => p.riskLevel === "HIGH").length, color: "#EF4444" },
-                          { name: "Normal Risk", value: products.filter(p => p.riskLevel === "NORMAL" || p.riskLevel === "MEDIUM").length, color: "#F59E0B" },
                           { name: "Low Risk", value: products.filter(p => !p.riskLevel || p.riskLevel === "LOW").length, color: "#10B981" }
                         ].filter(d => d.value > 0).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.1)" strokeWidth={2} />
@@ -598,7 +594,6 @@ const Dashboard = () => {
                     <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#1E293B', border: 'none', borderRadius: '8px', color: '#fff' }} />
                     <Legend />
                     <Bar dataKey="HIGH" name="High Risk" stackId="a" fill="#EF4444" radius={[0, 0, 4, 4]} />
-                    <Bar dataKey="NORMAL" name="Normal Risk" stackId="a" fill="#F59E0B" />
                     <Bar dataKey="LOW" name="Low Risk" stackId="a" fill="#10B981" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

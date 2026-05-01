@@ -61,6 +61,11 @@ export const getBatchesByProduct = async (productId) => {
   return response.json();
 };
 
+export const getAvailableQuantity = async (productId) => {
+    const batches = await getBatchesByProduct(productId);
+    return batches.reduce((sum, b) => sum + b.quantity, 0);
+};
+
 export const getDiscountLookup = async (productId, batchId) => {
   const response = await authFetch(
     `${API_BASE_URL}/discounts/lookup?productId=${productId}&batchId=${batchId}`
@@ -219,4 +224,101 @@ export const getReceiptPdf = async (billId) => {
     throw new Error(await parseError(response, "Failed to generate receipt PDF"));
   }
   return response.blob();
+};
+
+export const checkDuplicate = async (productId, saleDate, quantity, customerName) => {
+  try {
+    const params = new URLSearchParams({ productId, saleDate, quantity });
+    if (customerName) params.append("customerName", customerName);
+    const response = await authFetch(`${API_BASE_URL}/bills/check-duplicate?${params}`);
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.isDuplicate;
+  } catch {
+    return false;
+  }
+};
+
+// ─── Invigo Aliases ──────────────────────────────────────────────────────────
+
+export const recordPosSale = async (request) => {
+    const payload = {
+        ...request,
+        finalize: !request.asDraft,
+        lines: request.items.map(i => ({ 
+            productId: i.productId ? parseInt(String(i.productId)) : null, 
+            batchId: i.batchId ? parseInt(String(i.batchId)) : null, 
+            quantity: i.quantity 
+        }))
+    };
+    return createBill(payload);
+};
+
+export const voidSale = async (billId, voidedBy, voidReason) => {
+    return voidBill(billId, voidReason);
+};
+
+export const editSaleQuantity = async (saleId, newQuantity, editedBy, editReason) => {
+    // Note: The target backend doesn't support editing a single sale line directly via ID 
+    // for finalized bills. This is a legacy function in Invigo.
+    // In our new system, we use updateBill for drafts.
+    throw new Error("Direct line editing is disabled. Please update the full bill instead.");
+};
+
+export const updateBill = async (billGroupId, request) => {
+    const payload = {
+        ...request,
+        lines: request.items.map(i => ({ 
+            productId: i.productId ? parseInt(String(i.productId)) : null, 
+            batchId: i.batchId ? parseInt(String(i.batchId)) : null, 
+            quantity: i.quantity 
+        }))
+    };
+    return updateDraft(billGroupId, payload);
+};
+
+export const finalizeDraft = async (billGroupId, finalizedBy) => {
+    return finalizeBill(billGroupId);
+};
+
+export const getSalesHistory = async () => {
+    // Fetch all finalized bills and flatten them into line items for the Invigo UI
+    const bills = await getBills("FINALIZED");
+    const lines = [];
+    bills.forEach(bill => {
+        bill.lines.forEach(line => {
+            lines.push({
+                ...line,
+                saleGroupId: String(bill.id),
+                billNumber: bill.billNumber,
+                status: bill.status,
+                saleDate: bill.saleDate,
+                recordedBy: bill.createdBy,
+                notes: bill.notes,
+                customerName: bill.customerName,
+                customerEmail: bill.customerEmail,
+                lastEditedBy: null, // Target doesn't track this yet
+                lineTotal: line.totalAmount
+            });
+        });
+    });
+    // Also fetch drafts to show in history
+    const drafts = await getBills("DRAFT");
+    drafts.forEach(bill => {
+        bill.lines.forEach(line => {
+            lines.push({
+                ...line,
+                saleGroupId: String(bill.id),
+                billNumber: bill.billNumber,
+                status: bill.status,
+                saleDate: bill.saleDate,
+                recordedBy: bill.createdBy,
+                notes: bill.notes,
+                customerName: bill.customerName,
+                customerEmail: bill.customerEmail,
+                lineTotal: line.totalAmount
+            });
+        });
+    });
+    return lines.sort((a, b) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime() || b.id - a.id);
 };

@@ -54,6 +54,12 @@ public class SaleBill {
     @Column(name = "void_reason", columnDefinition = "TEXT")
     private String voidReason;
 
+    @Column(name = "customer_name", length = 255)
+    private String customerName;
+
+    @Column(name = "customer_email", length = 255)
+    private String customerEmail;
+
     @OneToMany(mappedBy = "saleBill", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Sale> lines = new ArrayList<>();
 
@@ -107,6 +113,12 @@ public class SaleBill {
 
     public String getVoidReason() { return voidReason; }
     public void setVoidReason(String voidReason) { this.voidReason = voidReason; }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public String getCustomerEmail() { return customerEmail; }
+    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
 
     public List<Sale> getLines() { return lines; }
     public void setLines(List<Sale> lines) { this.lines = lines; }

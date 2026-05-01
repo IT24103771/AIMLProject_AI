@@ -11,11 +11,25 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RoleRepository roleRepository;
 
     public UserService(UserRepository userRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       RoleRepository roleRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.roleRepository = roleRepository;
+    }
+
+    private void adjustRoleCount(String roleName, int delta) {
+        if (roleName == null || roleName.isBlank()) return;
+        roleRepository.findAll().stream()
+            .filter(r -> r.getRoleName().equalsIgnoreCase(roleName))
+            .findFirst()
+            .ifPresent(r -> {
+                r.setUsersAssigned(Math.max(0, r.getUsersAssigned() + delta));
+                roleRepository.save(r);
+            });
     }
 
     public Optional<User> authenticate(String username, String password) {
@@ -75,7 +89,9 @@ public class UserService {
         user.setFailedLoginAttempts(0);
         user.setAccountLocked(false);
 
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        adjustRoleCount(saved.getRoleName(), +1);
+        return saved;
     }
 
     public Optional<User> updateUser(Long id, User userDetails) {
@@ -120,12 +136,22 @@ public class UserService {
                 user.setPassword(passwordEncoder.encode(userDetails.getPassword()));
             }
 
-            return userRepository.save(user);
+            String oldRoleName = user.getRoleName();
+            User saved = userRepository.save(user);
+            String newRoleName = saved.getRoleName();
+            if (oldRoleName != null && !oldRoleName.equalsIgnoreCase(newRoleName != null ? newRoleName : "")) {
+                adjustRoleCount(oldRoleName, -1);
+                adjustRoleCount(newRoleName, +1);
+            } else if (oldRoleName == null && newRoleName != null) {
+                adjustRoleCount(newRoleName, +1);
+            }
+            return saved;
         });
     }
 
     public boolean deleteUser(Long id) {
         return userRepository.findById(id).map(user -> {
+            adjustRoleCount(user.getRoleName(), -1);
             userRepository.deleteById(id);
             return true;
         }).orElse(false);

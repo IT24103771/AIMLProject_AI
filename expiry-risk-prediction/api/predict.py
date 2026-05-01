@@ -38,27 +38,24 @@ def get_predictions(data):
             "action": "Sold out"
         }
         
-    # Expected Sales = salesVelocity * daysToExpiry
-    # Avoid div by zero if days_to_expiry is 0 (expires today)
-    safe_days = max(days_to_expiry, 0.5) 
-    expected_sales = sales_velocity * safe_days
+    # Improved 3-Level Risk Logic matching User's Manual
+    # Step 1: Calculate Days to Expiry (Floor at 1)
+    safe_days = max(days_to_expiry, 1.0) 
     
-    # Calculate ratio
-    # If expected_sales is 0, and we have quantity, it's infinite risk
-    if expected_sales <= 0:
-        ratio = 999.0 if remaining_qty > 0 else 0.0
-    else:
-        ratio = remaining_qty / expected_sales
+    # Step 2: Calculate Sales Velocity (Floor at 1)
+    safe_velocity = max(sales_velocity, 1.0)
+    
+    # Step 3: Calculate Expected Sales
+    expected_sales = safe_velocity * safe_days
+    
+    # Step 4: Calculate Ratio
+    ratio = remaining_qty / expected_sales
 
-    # Assign risk based on user's exact logic
-    if ratio > 1.5:
+    # Assign risk based on user's exact Binary logic
+    if ratio > 1.0:
         risk_level = "HIGH"
         risk_code = 1
         action = "CRITICAL: Urgent discount required"
-    elif ratio > 1.0:
-        risk_level = "NORMAL"
-        risk_code = 2
-        action = "MONITOR: Consider minor discount"
     else:
         risk_level = "LOW"
         risk_code = 0
